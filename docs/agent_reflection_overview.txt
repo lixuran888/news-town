@@ -1,0 +1,149 @@
+项目：Generative Agents（Stanford Town / Reverie）
+文档：Agent 组成与「反思-检索-洞察」底层逻辑（概念化说明）
+作者：Cascade（基于仓库源码梳理）
+更新时间：自动生成
+
+一、整体定位
+- 本项目由「前端（Django）」与「后端（Reverie 仿真服务器）」组成。
+- 后端以 ReverieServer 为核心，驱动多名 Persona（即智能体/Agent）在地图世界中持续感知、计划、行动，并通过文件与前端松耦合交互。
+- Persona 的核心认知链：Perceive（感知）→ Retrieve（检索）→ Plan（计划）→ Reflect（反思）→ Execute（执行）。
+
+二、Agent（Persona）的组成
+1) 记忆子系统
+  - 空间记忆（SpatialMemory / MemoryTree）
+    • 结构：world → sector → arena → [game_object...]
+    • 用途：用于“在哪里能做什么”，影响行动地址选择与对象选择。
+  - 联想/长期记忆（AssociativeMemory）
+    • 节点：ConceptNode（event / thought / chat）
+    • 关键字段：embedding_key、poignancy（重要性/情感强度）、keywords、created/expiration、last_accessed 等。
+    • 存储：每个 Persona 私有的 nodes.json、embeddings.json、kw_strength.json（人物独立的“知识库嵌入”）。
+  - 短期/工作记忆（Scratch）
+    • 感知与注意：vision_r（视野半径）、att_bandwidth（注意带宽）、retention（去重窗口）。
+    • 世界与日程：curr_time、curr_tile、daily_req、f_daily_schedule、f_daily_schedule_hourly_org。
+    • 当前行为：act_address、act_duration、act_description、act_event、act_pronunciatio。
+    • 路径与进度：planned_path、act_path_set。
+    • 对话：chatting_with、chat、chatting_with_buffer、chatting_end_time。
+    • 反思触发：importance_trigger_max / importance_trigger_curr / importance_ele_n；以及 recency_w / relevance_w / importance_w / recency_decay。
+
+2) 认知模块
+  - 感知（perceive）：视野内空间写入空间记忆；同一 arena 内收集事件，按距离选前 att_bandwidth 个；对过去 retention 去重；为新增事件写入长期记忆（event + 可选 chat 关联），并按事件 poignancy 递减触发器值（importance_trigger_curr）与累加元素计数（importance_ele_n）。
+  - 检索（retrieve/new_retrieve）：
+    • retrieve：按关键词索引取相关 events/thoughts。
+    • new_retrieve：基于 recency（最近性）、relevance（嵌入相似度）、importance（poignancy）综合打分，返回 Top-N 关键节点（并刷新 last_accessed）。
+  - 计划（plan）：
+    • 长期：当日首次或跨天触发，生成 wake_up_hour、broad-strokes daily_req 与分钟级 hourly_schedule（必要时在日内进行任务分解）。
+    • 短期：选定 sector/arena 与 game_object（可回退 <random>），生成动作三元、表情、物件动作等，写入 Scratch 的当前行动。
+    • 对话/反应：基于检索与策略决定是否交互、等待或继续。
+  - 反思（reflect）：详见后文「三、反思-检索-洞察 全链路」。
+  - 执行（execute）：寻路到目标地址候选 tile（尽量避开他人占位），输出下一步移动坐标与描述。
+
+三、反思-检索-洞察：从“事件”到“智慧”的全链路
+（面向概念与运行机理的说明，不包含源码细节）
+
+0) 核心术语与作用（对齐业务语言）
+| 概念 | 通俗解释 | 作用 |
+| 触发器（Trigger） | 类似“反思闹钟”，达到阈值后启动反思流程。 | 控制反思频率，避免资源浪费。 |
+| 焦点（Focal Points） | 从近期记忆中筛选出的主题（如“与 Alice 的旅行对话”）。 | 聚焦反思方向，避免无目标处理海量记忆。 |
+| 检索（Retrieval） | 围绕焦点从记忆库中“找证据”（多条事件/想法/对话节点）。 | 为生成洞察提供素材，确保结论有依据。 |
+| 洞察（Insights） | 基于多条证据提炼的高阶结论（如“Alice 偏好徒步”）。 | 把碎片化信息升华为可复用知识。 |
+| 证据（Evidence） | 支撑洞察的具体记忆节点（node_id 列表）。 | 确保结论可追溯、可审计。 |
+| 三元（S, P, O） | 将洞察转为“主语-谓语-宾语”结构。 | 为记忆提供结构化标签，便于快速索引。 |
+| 重要性分数（Poignancy） | 记忆/洞察的重要性/情感强度打分。 | 决定优先级，影响检索权重与触发器扣减。 |
+| 向量表示（Embedding） | 将文本转成语义向量。 | 支持相似性检索与主题聚合。 |
+
+1) 阶段1：触发判断（是否需要反思？）
+- 条件：importance_trigger_curr ≤ 0，且联想记忆中存在事件或想法。
+- 机制：每观测一个“非 idle”事件，会：
+  • 计算该事件的 poignancy；
+  • importance_trigger_curr -= poignancy；
+  • importance_ele_n += 1；
+  当累计扣减达阈值，触发反思。
+- 目的：用“事件的重要性”驱动反思频率，节约资源。
+
+2) 阶段2：筛选焦点（该关注什么？）
+- 输入：最近 importance_ele_n 个关键节点的 embedding_key 文本。
+- 行为：通过语言模型生成若干 Focal Points（3±）。
+- 输出：焦点列表（如“Alice 的旅行偏好”“户外装备兴趣”）。
+- 价值：把注意力集中到“最近最重要”的主题。
+
+3) 阶段3：检索证据（有哪些相关记忆？）
+- 对每个 Focal Point 进行 new_retrieve：
+  • 取所有（非 idle）event + thought，按 last_accessed 排序；
+  • 计算三项分：
+    - Recency：根据 recency_decay 衰减的最近性；
+    - Importance：节点自身的 poignancy；
+    - Relevance：焦点文本与节点 embedding 的余弦相似度；
+  • 归一化并按权重（recency_w / relevance_w / importance_w，与内置 gw 加权）组合，取 Top-N；
+  • 更新这些节点的 last_accessed（被使用即“温习”）。
+- 结果：为每个焦点得到一组“证据节点”。
+
+4) 阶段4：生成洞察与证据（结论是什么？依据是什么？）
+- 输入：证据节点列表（带 embedding_key 文本）。
+- 行为：语言模型基于证据生成多条“洞察 thought”，并为每条洞察给出“证据下标列表”。
+- 映射：将证据下标映射为真实 node_id，形成洞察→证据 node_id 的映射。
+- 价值：洞察可追溯到具体记忆节点，避免“无中生有”。
+
+5) 阶段5：结构化处理（如何让机器理解？）
+- 三元（S, P, O）：把洞察转为语义三元组（如“[Alice, 喜欢, 徒步]”）。
+- 重要性分数（Poignancy）：为洞察打分，决定“知识地位”。
+- 向量（Embedding）：为洞察文本生成 embedding（便于后续相似性检索与召回）。
+- 时间属性：记录 created 与 expiration（如有效 30 天）。
+
+6) 阶段6：写回记忆（如何保存成果？）
+- 将洞察作为 thought 节点写入人物的 AssociativeMemory：
+  • 文本：洞察全文；
+  • 三元：S, P, O；
+  • 证据：filling = [node_id ...]；
+  • 重要性：poignancy；
+  • 向量：embedding_key → vector；
+  • 序列：加入 seq_thought，更新倒排与缓存。
+- 价值：让“结论化知识”进入人物长期记忆，供后续计划/对话直接引用。
+
+7) 阶段7：重置触发器与特殊流程
+- 重置：importance_trigger_curr 置回 importance_trigger_max，importance_ele_n 清零，等待下一轮积累。
+- 对话后反思（特殊）：当对话到达结束时间：
+  • 生成“规划性思考”（Planning Thought）：如“明天推荐 Alice 户外装备商店”；
+  • 生成“备忘 Memo”：如“Alice 喜欢高海拔路线”；
+  • 两者均写入 thought，并用最近 chat 节点作为 evidence。
+
+四、对 Agent 行为的影响
+1) 更低推理成本
+- 未来在计划与对话中，可以直接以“洞察 thought”作为高阶知识，不必反复扫描底层碎片，降低 LLM 调用与检索代价。
+
+2) 行为更连贯
+- 长期计划与短期分解可利用历史洞察，让人物表现出“持续的偏好与目标”，减少随机性与割裂感。
+
+3) 可解释性与可审计
+- 每条洞察附带证据 node_id，可追溯到具体的事件或对话，便于复盘与安全审计。
+
+五、模块协作关系（简要）
+- 记忆管理（AssociativeMemory / Scratch / SpatialMemory）：
+  • 提供近期事件/想法；保存新洞察；维护 embeddings 与倒排索引。
+- 检索器（new_retrieve）：
+  • 输入焦点文本；按最近性/相关性/重要性融合输出证据集合。
+- 语言模型（LLM）：
+  • 生成焦点、洞察、三元、重要性评分；在计划与对话中产出语义内容。
+- Embedding 服务：
+  • 将文本转为向量（支持相似度计算与复用）。
+
+六、典型场景
+- 日常反思：一天中多次事件导致触发器归零 → 生成“Bob 关注环保”“Charlie 周末露营”等洞察。
+- 对话后专项反思：与 Alice 的商务对话结束 → 自动写入 Planning 与 Memo 两类 thought。
+
+七、注意事项（工程向）
+- 阈值调优：importance_trigger_max 过高会导致反思短缺，过低会频繁反思浪费资源。
+- 证据优先与可追溯：任何洞察必须能映射到 node_id 列表，避免“虚假记忆”。
+- 嵌入复用：优先命中人物私有 embeddings.json，未命中再计算，降低成本。
+- 计划/对话的 LLM 依赖：洞察质量受 prompt/模型质量影响，必要时做缓存或模板化。
+
+八、文件/目录要点（只列关键抽象）
+- 后端：reverie/backend_server/
+  • reverie.py（仿真主循环）
+  • persona/persona.py（Agent 汇总与 move()）
+  • persona/memory_structures/{spatial_memory.py, associative_memory.py, scratch.py}
+  • persona/cognitive_modules/{perceive.py, retrieve.py, plan.py, reflect.py, execute.py, converse.py}
+- 前端：environment/frontend_server/
+  • storage/<sim_code>/ 下是仿真现场数据与每名人物的私有长期记忆（含 embeddings）。
+
+九、一句话总结
+- 该 Agent 体系以“事件重要性驱动的反思触发”为开关，以“焦点 → 检索 → 洞察 → 存档”为主链路，把碎片化经历凝练成结构化长期知识；这些知识反过来驱动更连贯、可解释、低冗余的长期行为与决策。
