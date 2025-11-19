@@ -159,8 +159,10 @@ class Scratch:
     self.planned_path = []
 
     if check_if_file_exists(f_saved): 
-      # If we have a bootstrap file, load that here. 
-      scratch_load = json.load(open(f_saved))
+      # If we have a bootstrap file, load that here. Use UTF-8 to avoid
+      # Windows default GBK decoding issues with non-ASCII characters.
+      with open(f_saved, encoding="utf-8") as f:
+        scratch_load = json.load(f)
 
       self.vision_r = scratch_load["vision_r"]
       self.att_bandwidth = scratch_load["att_bandwidth"]

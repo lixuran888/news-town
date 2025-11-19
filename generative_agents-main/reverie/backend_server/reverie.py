@@ -58,6 +58,25 @@ class ReverieServer:
     sim_folder = f"{fs_storage}/{self.sim_code}"
     copyanything(fork_folder, sim_folder)
 
+    # 清理旧 environment：保留 0.json，删除其余步数，避免沿用旧世界中缺少专家的帧
+    env_folder = f"{sim_folder}/environment"
+    if os.path.isdir(env_folder):
+      for fname in os.listdir(env_folder):
+        if fname.endswith(".json") and fname.split(".")[0] != "0":
+          try:
+            os.remove(os.path.join(env_folder, fname))
+          except OSError:
+            pass
+
+    # 重置 movement 目录，确保当前 run 从空白 movement 开始
+    movement_folder = f"{sim_folder}/movement"
+    if os.path.isdir(movement_folder):
+      try:
+        shutil.rmtree(movement_folder)
+      except OSError:
+        pass
+    os.makedirs(movement_folder, exist_ok=True)
+
     with open(f"{sim_folder}/reverie/meta.json") as json_file:  
       reverie_meta = json.load(json_file)
 
@@ -338,8 +357,14 @@ class ReverieServer:
           game_obj_cleanup = dict()
 
           # We first move our personas in the backend environment to match 
-          # the frontend environment. 
+          # the frontend environment. In some edge cases, the current
+          # environment JSON may be missing a persona key (e.g., if the
+          # frontend did not write that agent for this frame). To avoid
+          # crashing the whole simulation with a KeyError, we skip any
+          # persona that does not appear in new_env for this step.
           for persona_name, persona in self.personas.items(): 
+            if persona_name not in new_env:
+              continue
             # <curr_tile> is the tile that the persona was at previously. 
             curr_tile = self.personas_tile[persona_name]
             # <new_tile> is the tile that the persona will move to right now,
