@@ -1,0 +1,163 @@
+标题：将外部领域知识嵌入专业领域 Agent（以“建筑学家”Agent 为例）
+作者：Cascade
+用途：指导把“领域教科书/规范”等外部知识与 Agent 的个人经历/反思融合，形成专业智能体。
+更新时间：自动生成
+
+[插图1：整体现路图（建议放本文件顶部）]
+说明：外部领域知识 → 嵌入方法选择（初始化/反思强化/定制检索器）→ 融合入知识库 → 专业领域智能体
+（若暂无法插入图片，请在 HTML 里将提供的流程图放在此处）
+
+一、两类知识与总体关系
+- 内部个人知识（当前已有）：
+  来自感知/对话/反思的“个人经历”，如“客户A偏好可持续材料”。
+- 外部领域知识（本次要加）：
+  教科书/规范/图集等先验知识，如“《建筑防火规范》第X条……”。
+
+[表1：两类知识对照]
+| 维度 | 个人知识（经验） | 领域知识（先验） | 结合价值 |
+| --- | --- | --- | --- |
+| 来源 | 感知/对话/反思沉淀 | 教材/规范/论文/图集 | “理论+实践”形成专家能力 |
+| 粒度 | 事件/想法/聊天 | 法条/原则/概念/范式 | 互为证据与背景 |
+| 更新 | 随运行持续生成 | 批量导入、低频更新 | 保持一致与时效 |
+| 作用 | 反映个体偏好与历史 | 约束与指导决策边界 | 提升专业性与可靠性 |
+
+二、三种核心嵌入方法（从易到难、从局部到全局）
+- 方法一：初始化写入（最简单，立竿见影）
+  目标：Agent“出生即带书本”，确保后续检索能命中专业知识。
+  放置点：Agent 初始化/创建阶段。
+  实施：把领域知识整理为“事实/规则”列表，写入长期记忆（event 或 thought）。
+  标注：poignancy=高、tags 包含 ["domain_knowledge","architecture"].
+
+  伪代码（Python，示例）：
+  ```python
+  # e.g. 在 persona 初始化完成后
+  domain_knowledge = [
+      "《建筑防火规范》: 高层建筑必须使用A级防火材料。",
+      "结构常识: 承重墙不可随意拆除。",
+      "风格知识: 哥特式建筑的特征是尖拱、飞扶壁和彩色玻璃窗。"
+  ]
+  for fact in domain_knowledge:
+      associative_memory.add_event(
+          content=fact,
+          poignancy=0.9,
+          tags=["domain_knowledge","architecture"],
+      )
+  ```
+  预计改动文件（参考仓库结构）：
+  - reverie/backend_server/persona/persona.py（或创建 persona 时的构造逻辑）
+  - reverie/backend_server/persona/memory_structures/associative_memory.py（已有接口直接复用）
+
+- 方法二：反思过程强化（更智能，促进“理论联系实际”）
+  目标：反思时把“领域主题”也作为焦点来源，联合检索“个人记忆+外部知识库”，生成更专业的洞察。
+  放置点：反思链路的“焦点生成/证据检索”。
+  实施：
+  1) 维护一个外部知识集合（可本地 JSON/CSV/向量库），带标签：{"tags":["domain_knowledge","architecture"]}。
+  2) 生成焦点时，追加领域焦点种子（如“建筑结构安全”“材料选择规范”）。
+  3) 检索阶段把“个人记忆检索结果 + 领域知识检索结果”合并，必要时对领域结果加权。
+
+  伪代码（Python，示例）：
+  ```python
+  def enhanced_retrieve(focal_point: str):
+      personal = new_retrieve_from_personal(focal_point)
+      domain = retrieve_from_domain_kb(focal_point)  # 从外部库
+      # 为领域知识打一个轻权重，避免完全碾压个人经历
+      for n in domain:
+          n.score *= 1.15
+      return rank_and_topk(personal + domain)
+  ```
+  预计改动文件：
+  - reverie/backend_server/persona/cognitive_modules/reflect.py（焦点与检索串联处）
+  - （新增）external_kb/ 目录 + 加载/检索工具（简单版可 JSON + 关键词/嵌入检索）
+
+- 方法三：定制化检索器（最高级，影响全局排序）
+  目标：在所有检索/召回里，对“领域知识节点”提高权重，使系统呈现稳定的专家倾向。
+  放置点：检索评分函数，融合最近性/相关性/重要性时加入“领域加权”。
+
+  伪代码（Python，示例）：
+  ```python
+  def domain_aware_score(node, recency, relevance, importance):
+      score = 0.25*recency + 0.40*relevance + 0.35*importance
+      if "domain_knowledge" in getattr(node, "tags", []):
+          score *= 1.5  # 领域知识加权
+      return score
+  ```
+  预计改动文件：
+  - reverie/backend_server/persona/memory_structures/associative_memory.py 或检索模块实现处
+  - reverie/backend_server/persona/cognitive_modules/reflect.py（如在此融合评分）
+
+三、外部知识数据形态与落地建议
+- 最小可行：一个 JSONL/CSV，每行一个知识点。
+  示例 JSONL（建议）：
+  ```json
+  {"content":"《建筑防火规范》: 高层建筑必须使用A级防火材料。","tags":["domain_knowledge","architecture"],"poignancy":0.9}
+  {"content":"承重墙不可随意拆除。","tags":["domain_knowledge","architecture"],"poignancy":0.85}
+  {"content":"哥特式建筑特征：尖拱、飞扶壁、彩窗。","tags":["domain_knowledge","architecture"],"poignancy":0.8}
+  ```
+- 中级方案：为每条知识生成 embedding，放入本地向量库（FAISS/JSON 向量表），在 enhanced_retrieve 中相似度检索。
+- 高级方案：构建小型知识图谱（S-P-O 三元），支持结构化问答与规则匹配。
+
+四、与现有链路对齐的“插入点”清单（建议先做方法一→二→三）
+- 初始化阶段：persona 构造完成后批量 add_event/add_thought（方法一）。
+- 反思阶段：
+  - 焦点生成：追加领域焦点种子（如列表/模板）。
+  - 检索：合并个人与外部库结果，并给予领域轻权重（方法二）。
+- 检索评分：在全局打分中对含有 "domain_knowledge" 标签的节点做 multiplicative boost（方法三）。
+
+五、质量与风险控制
+- 不要让领域知识“淹没”个体体验：领域权重宜适度（如 1.1~1.5）。
+- 证据链与可解释：保持 thought 写回时附 evidence 列表（可含领域知识节点 ID）。
+- 去重与版本：同义近邻合并；规范版本/发布日期入 tags（如 "code:GB50016-2014"）。
+- 渐进发布：先在 1 人物/小场景灰度，观察行为是否更专业（如材料选择、对话建议）。
+
+六、观测指标（落地评估）
+- 专业性命中率：计划/对话中引用领域知识的比例。
+- 纠错能力：违规请求被规范驳回/修正的比例。
+- 可解释率：含有效证据链的专业结论占比。
+- 成本与延迟：检索耗时/向量生成命中率。
+
+七、落地最小任务（建议顺序）
+1) 整理 30~100 条“建筑学基础知识”到 JSONL（见示例）。
+2) 在 persona 初始化处批量写入（方法一）。
+3) 新增 external_kb 简易检索（关键词或向量），并在反思检索合并（方法二）。
+4) 在融合打分中加入 "domain_knowledge" 标签加权（方法三）。
+5) 设立小型验证用例：
+   - 场景：客户想拆承重墙；Agent 应给出规范性提醒并解释依据。
+   - 指标：是否引用对应规范条款，是否提供证据链。
+
+八、代码改动位导航（仓库相对路径）
+- 反思模块：
+  reverie/backend_server/persona/cognitive_modules/reflect.py
+  - 焦点生成：追加“领域焦点种子”。
+  - 检索调用：在 new_retrieve 后合并 external_kb 检索结果。
+- 记忆结构与检索：
+  reverie/backend_server/persona/memory_structures/associative_memory.py
+  - 写入接口：支持 tags/poignancy ；
+  - 检索融合：加入 domain_aware_score（如在此实现）。
+- Persona 初始化：
+  reverie/backend_server/persona/persona.py
+  - 构造完成后，导入 JSONL 知识并批量 add_event。
+- 外部知识目录（新增建议）：
+  external_kb/
+  - architecture_domain_knowledge.jsonl
+  - build_index.py / search.py（简单关键词/向量检索器）
+
+九、图片占位（供后续 HTML 渲染）
+- [插图1：方法总览流程图，建议放在“标题与用途”下方]
+- [插图2：方法二的“反思强化”数据流（焦点→检索→洞察→写回）]
+- [插图3：方法三的“加权检索器”公式与示意图]
+
+十、附：加权与阈值的起步参数（可按场景调优）
+- 检索融合权重：wr=0.25（Recency），wi=0.35（Importance），ws=0.40（Relevance）。
+- 领域加权：domain_boost=1.2~1.5（先小后大，避免碾压个人经历）。
+- 反思触发：保持原触发器逻辑；如领域知识过多，可放宽焦点数上限至 4~5。
+
+十一、后续演进路线
+- 主题模板库：针对不同专业（建筑/结构/材料/规划）维护焦点模板。
+- 规范版本管理：tags 增加标准号与年份，支持按版本检索。
+- 结构化三元：为领域知识补齐 S-P-O，支持图检索与规则推断。
+- 评测集：构造 50 条“专业判断题”，每周回归评估。
+
+—— 以上为可直接落地的实施说明。若需要，我可以：
+1) 生成 minimal external_kb JSONL 样例文件；
+2) 在 reflect.py 中注入合并检索的示例代码（受控开关）；
+3) 出一版 HTML 演示页，包含上方表格与图片占位。

@@ -373,14 +373,26 @@ def run_gpt_prompt_task_decomp(persona,
     for count, i in enumerate(_cr): 
       k = [j.strip() for j in i.split("(duration in minutes:")]
       task = k[0]
-      if task[-1] == ".": 
+      if len(k) < 2:
+        # Malformed line without duration section; skip gracefully
+        continue
+      if task and task[-1] == ".": 
         task = task[:-1]
-      duration = int(k[1].split(",")[0].strip())
+      try:
+        duration = int(k[1].split(",")[0].strip())
+      except (ValueError, IndexError):
+        # If duration cannot be parsed, skip this line
+        continue
       cr += [[task, duration]]
 
     total_expected_min = int(prompt.split("(total duration in minutes")[-1]
                                    .split("):")[0].strip())
     
+    # 如果完全没有解析出任何合法子任务，退回一个单块任务，
+    # 整个 duration 都给原始 task，避免后续逻辑访问空列表时报错。
+    if len(cr) == 0:
+      return [[task, total_expected_min]]
+
     # TODO -- now, you need to make sure that this is the same as the sum of 
     #         the current action sequence. 
     curr_min_slot = [["dummy", -1],] # (task_name, task_index)
@@ -399,6 +411,8 @@ def run_gpt_prompt_task_decomp(persona,
       for i in range(1, 6): 
         curr_min_slot[-1 * i] = last_task
     elif len(curr_min_slot) < total_expected_min: 
+      # len(cr) > 0 且 curr_min_slot 为空的边界情况上面已 return，
+      # 这里可以安全地取最后一个元素。
       last_task = curr_min_slot[-1]
       for i in range(total_expected_min - len(curr_min_slot)):
         curr_min_slot += [last_task]
@@ -709,11 +723,15 @@ def run_gpt_prompt_action_arena(action_description,
   fail_safe = get_fail_safe()
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  print (output)
-  # y = f"{act_world}:{act_sector}"
-  # x = [i.strip() for i in persona.s_mem.get_str_accessible_sector_arenas(y).split(",")]
-  # if output not in x: 
-  #   output = random.choice(x)
+  # 将模型输出限制为当前 world+sector 下可访问的合法房间，
+  # 避免出现例如 'kitchen' 这类在地图中不存在的键导致 KeyError。
+  y = f"{act_world}:{act_sector}"
+  valid_arenas_raw = persona.s_mem.get_str_accessible_sector_arenas(y)
+  valid_arenas = [i.strip() for i in valid_arenas_raw.split(",") if i.strip()]
+  if valid_arenas:
+    if output not in valid_arenas:
+      # 如果模型给出了非法房间名，则退回到一个合法房间
+      output = valid_arenas[0]
 
   if debug or verbose: 
     print_run_prompts(prompt_template, persona, gpt_param, 

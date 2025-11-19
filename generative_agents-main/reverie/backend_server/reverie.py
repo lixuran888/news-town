@@ -34,6 +34,7 @@ from global_methods import *
 from utils import *
 from maze import *
 from persona.persona import *
+from expert_init import inject_food_poisoning_event
 
 ##############################################################################
 #                                  REVERIE                                   #
@@ -126,6 +127,9 @@ class ReverieServer:
       p_x = init_env[persona_name]["x"]
       p_y = init_env[persona_name]["y"]
       curr_persona = Persona(persona_name, persona_folder)
+
+      # 在初始化时为每个 persona 注入一次校园食物中毒事件的长期记忆
+      inject_food_poisoning_event(curr_persona, self.curr_time)
 
       self.personas[persona_name] = curr_persona
       self.personas_tile[persona_name] = (p_x, p_y)
@@ -379,6 +383,12 @@ class ReverieServer:
             next_tile, pronunciatio, description = persona.move(
               self.maze, self.personas, self.personas_tile[persona_name], 
               self.curr_time)
+
+            # 对 Public Health Expert：在 23:00 之后不向前端输出坐标
+            if (persona_name == "Public Health Expert" and
+                self.curr_time.hour >= 23):
+              continue
+
             movements["persona"][persona_name] = {}
             movements["persona"][persona_name]["movement"] = next_tile
             movements["persona"][persona_name]["pronunciatio"] = pronunciatio

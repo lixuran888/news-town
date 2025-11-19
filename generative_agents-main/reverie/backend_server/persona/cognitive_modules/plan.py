@@ -161,7 +161,9 @@ def generate_task_decomp(persona, task, duration):
 
   """
   if debug: print ("GNS FUNCTION: <generate_task_decomp>")
-  return run_gpt_prompt_task_decomp(persona, task, duration)[0]
+  # 简化版：不调用 GPT，直接把整个任务当作一个区块执行，时长为原始 duration。
+  # 这样可以避免因外部 API 或解析异常导致仿真整体中断。
+  return [[task, duration]]
 
 
 def generate_action_sector(act_desp, persona, maze): 
@@ -279,6 +281,11 @@ def generate_convo(maze, init_persona, target_persona):
 
   # convo = run_gpt_prompt_create_conversation(init_persona, target_persona, curr_loc)[0]
   # convo = agent_chat_v1(maze, init_persona, target_persona)
+  # 对于 Public Health Expert，不触发任何 agent-to-agent 聊天逻辑
+  if (init_persona.scratch.name == "Public Health Expert" or
+      target_persona.scratch.name == "Public Health Expert"):
+    return []
+
   convo = agent_chat_v2(maze, init_persona, target_persona)
   all_utt = ""
 
