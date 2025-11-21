@@ -32,6 +32,83 @@ def get_random_alphanumeric(i=6, j=6):
   return x
 
 
+def run_gpt_prompt_public_opinion(chat_corpus: str,
+                                  test_input: str = None,
+                                  verbose: bool = False):
+  """Summarize citizen chats into a high-level public opinion description.
+
+  chat_corpus: A long string containing multiple chat snippets about the
+  campus food poisoning / cafeteria / school. The function returns a
+  single short paragraph that captures the main public sentiment,
+  concerns and disagreements.
+  """
+
+  def create_prompt_input(chat_corpus_in: str, test_input_in: str = None):
+    if test_input_in is not None:
+      return test_input_in
+
+    # 这里直接构造一个简单的中文 prompt，而不是依赖外部模板文件，
+    # 便于在本地快速迭代。
+    prompt = (
+      "下面是一批围绕校园食物中毒、食堂和学校处理的聊天记录片段。\n"
+      "请用简洁的中文总结当前民众的整体舆论：\n"
+      "- 主要担忧点是什么？\n"
+      "- 对学校和食堂的态度如何？\n"
+      "- 是否存在明显的分歧或不同立场？\n\n"
+      "聊天记录：\n"
+      f"{chat_corpus_in}\n\n"
+      "请用 3~5 句话输出一个连贯的摘要，不要逐条重复原文。"
+    )
+    return prompt
+
+  def __func_clean_up(gpt_response, prompt=""):
+    # 直接返回去掉首尾空白的文本作为摘要
+    return gpt_response.strip()
+
+  def __func_validate(gpt_response, prompt=""):
+    try:
+      cleaned = __func_clean_up(gpt_response, prompt)
+      return len(cleaned) > 0
+    except Exception:
+      return False
+
+  def get_fail_safe():
+    return (
+      "民众普遍对校园食物中毒事件表示担忧，对学校和食堂的管理能力缺乏信任，"
+      "希望尽快查清原因并给出透明公开的说明。也有少数声音认为网络舆论存在夸大，"
+      "但整体情绪偏向谨慎和不安。"
+    )
+
+  gpt_param = {
+    "engine": "text-davinci-003",
+    "max_tokens": 300,
+    "temperature": 0.7,
+    "top_p": 1,
+    "stream": False,
+    "frequency_penalty": 0,
+    "presence_penalty": 0,
+    "stop": None,
+  }
+
+  prompt = create_prompt_input(chat_corpus, test_input)
+  fail_safe = get_fail_safe()
+
+  output = safe_generate_response(
+    prompt,
+    gpt_param,
+    5,
+    fail_safe,
+    __func_validate,
+    __func_clean_up,
+  )
+
+  if debug or verbose:
+    print_run_prompts("inline/public_opinion", None, gpt_param,
+                      [chat_corpus], prompt, output)
+
+  return output, [output, prompt, gpt_param, [chat_corpus], fail_safe]
+
+
 ##############################################################################
 # CHAPTER 1: Run GPT Prompt
 ##############################################################################
@@ -178,15 +255,25 @@ def run_gpt_prompt_generate_hourly_schedule(persona,
       schedule_format += f" Activity: [Fill in]\n"
     schedule_format = schedule_format[:-1]
 
-    intermission_str = f"Here the originally intended hourly breakdown of"
-    intermission_str += f" {persona.scratch.get_str_firstname()}'s schedule today: "
-    for count, i in enumerate(persona.scratch.daily_req): 
-      intermission_str += f"{str(count+1)}) {i}, "
-    intermission_str = intermission_str[:-2]
+    # 用更短的方式概述今天的大致计划，避免在 prompt 中重复很长的编号列表。
+    daily_reqs = persona.scratch.daily_req or []
+    if daily_reqs:
+      max_items = 5
+      short_reqs = daily_reqs[:max_items]
+      more_flag = "" if len(daily_reqs) <= max_items else " 等"
+      intermission_str = (
+        f"Here is a rough outline of {persona.scratch.get_str_firstname()}'s "
+        f"schedule today: " + "; ".join(short_reqs) + more_flag
+      )
+    else:
+      intermission_str = (
+        f"{persona.scratch.get_str_firstname()} has a flexible day with no "
+        f"strongly pre-planned commitments."
+      )
 
     prior_schedule = ""
     if p_f_ds_hourly_org: 
-      prior_schedule = "\n"
+      prior_schedule = ""
       for count, i in enumerate(p_f_ds_hourly_org): 
         prior_schedule += f"[(ID:{get_random_alphanumeric()})" 
         prior_schedule += f" {persona.scratch.get_str_curr_date_str()} --"
@@ -206,7 +293,7 @@ def run_gpt_prompt_generate_hourly_schedule(persona,
     prompt_input += [schedule_format]
     prompt_input += [persona.scratch.get_str_iss()]
 
-    prompt_input += [prior_schedule + "\n"]
+    prompt_input += [prior_schedule]
     prompt_input += [intermission_str]
     if intermission2: 
       prompt_input += [intermission2]
@@ -265,7 +352,7 @@ def run_gpt_prompt_generate_hourly_schedule(persona,
   # # ChatGPT Plugin ===========================================================
 
 
-  gpt_param = {"engine": "text-davinci-003", "max_tokens": 50, 
+  gpt_param = {"engine": "text-davinci-003", "max_tokens": 30, 
                "temperature": 0.5, "top_p": 1, "stream": False,
                "frequency_penalty": 0, "presence_penalty": 0, "stop": ["\n"]}
   prompt_template = "persona/prompt_template/v2/generate_hourly_schedule_v2.txt"
@@ -2213,8 +2300,18 @@ def run_gpt_prompt_insight_and_guidance(persona, statements, n, test_input=None,
 
 def run_gpt_prompt_agent_chat_summarize_ideas(persona, target_persona, statements, curr_context, test_input=None, verbose=False): 
   def create_prompt_input(persona, target_persona, statements, curr_context, test_input=None): 
-    prompt_input = [persona.scratch.get_str_curr_date_str(), curr_context, persona.scratch.currently, 
-                    statements, persona.scratch.name, target_persona.scratch.name]
+    """构造用于概括对话要点的输入。
+
+    在原有的日期、当前情境、人物背景和相关记忆基础上，增加一条显式指示：
+    如果最近记忆中包含与某起公共事件（例如校园食物中毒、学校事故等）直接相关的记录，
+    请优先围绕这些最新的公共事件展开对话，而不是沉溺于过往的旧故事。
+    """
+    guidance = ("如果最近的记忆中包含与某起公共事件（例如校园食物中毒、学校事故、校园安全事件等）" 
+                "直接相关的记录，请在生成接下来的对话要点时，优先围绕这些最新的公共事件展开，" 
+                "关注民众的担忧、质疑和讨论，而不要过多停留在与当前公共事件无关的旧故事上。")
+
+    prompt_input = [persona.scratch.get_str_curr_date_str(), curr_context, persona.scratch.currently,
+                    guidance, statements, persona.scratch.name, target_persona.scratch.name]
     return prompt_input
   
   def __func_clean_up(gpt_response, prompt=""):

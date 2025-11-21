@@ -295,10 +295,21 @@ class AssociativeMemory:
   def get_str_seq_chats(self): 
     ret_str = ""
     for count, event in enumerate(self.seq_chat): 
-      ret_str += f"with {event.object.content} ({event.description})\n"
+      # 在当前实现中，object 通常是字符串（例如 "chat with Maria Lopez"），
+      # 早期代码假设其为带 .content 的复杂对象，会触发 AttributeError。
+      obj = event.object
+      if hasattr(obj, "content"):
+        obj_str = obj.content
+      else:
+        obj_str = str(obj)
+
+      ret_str += f"with {obj_str} ({event.description})\n"
       ret_str += f'{event.created.strftime("%B %d, %Y, %H:%M:%S")}\n'
-      for row in event.filling: 
-        ret_str += f"{row[0]}: {row[1]}\n"
+
+      if event.filling:
+        for row in event.filling:
+          if len(row) >= 2:
+            ret_str += f"{row[0]}: {row[1]}\n"
     return ret_str
 
 

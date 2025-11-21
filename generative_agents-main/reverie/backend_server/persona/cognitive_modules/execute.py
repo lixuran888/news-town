@@ -78,8 +78,25 @@ def execute(persona, maze, personas, plan):
 
     elif "<random>" in plan: 
       # Executing a random location action.
-      plan = ":".join(plan.split(":")[:-1])
-      target_tiles = maze.address_tiles[plan]
+      # plan 形如 "the Ville:Town Hall:kitchen:<random>"；这里先去掉
+      # ":<random>" 后缀，然后在该地址下面随机选一个 tile。
+      base_addr = ":".join(plan.split(":")[:-1])
+
+      if base_addr in maze.address_tiles:
+        target_tiles = maze.address_tiles[base_addr]
+      else:
+        # 与默认分支相同的回退策略，避免 DeepSeek 生成的非法地址导致 KeyError。
+        living_addr = None
+        try:
+          living_addr = persona.scratch.living_area
+        except Exception:
+          living_addr = None
+
+        if living_addr and living_addr in maze.address_tiles:
+          target_tiles = maze.address_tiles[living_addr]
+        else:
+          target_tiles = [persona.scratch.curr_tile]
+
       target_tiles = random.sample(list(target_tiles), 1)
 
     else: 
@@ -88,8 +105,23 @@ def execute(persona, maze, personas, plan):
       # Retrieve the target addresses. Again, plan is an action address in its
       # string form. <maze.address_tiles> takes this and returns candidate 
       # coordinates. 
-      if plan not in maze.address_tiles: 
-        maze.address_tiles["Johnson Park:park:park garden"] #ERRORRRRRRR
+      if plan not in maze.address_tiles:
+        # 有时 DeepSeek 会生成地图中不存在的地址（例如 "the Ville:Town Hall:kitchen"）。
+        # 为避免 KeyError 或后续使用 None 触发崩溃，这里做回退策略：
+        # 1）优先尝试 persona 的 living_area（例如 "the_ville:Dorm:bedroom"）
+        # 2）如果 living_area 也不在 address_tiles，则退回当前 tile，保持原地不动。
+        living_addr = None
+        try:
+          # living_area 形如 "the_ville:Dorm for Oak Hill College:bedroom"
+          living_addr = persona.scratch.living_area
+        except Exception:
+          living_addr = None
+
+        if living_addr and living_addr in maze.address_tiles:
+          target_tiles = maze.address_tiles[living_addr]
+        else:
+          # 退回当前 tile 作为唯一目标点
+          target_tiles = [persona.scratch.curr_tile]
       else: 
         target_tiles = maze.address_tiles[plan]
 

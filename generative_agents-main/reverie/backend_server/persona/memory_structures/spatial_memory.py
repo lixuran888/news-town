@@ -76,9 +76,22 @@ class MemoryTree:
       "bedroom, kitchen, dining room, office, bathroom"
     """
     curr_world, curr_sector = sector.split(":")
-    if not curr_sector: 
+    if not curr_sector:
       return ""
-    x = ", ".join(list(self.tree[curr_world][curr_sector].keys()))
+
+    # 原始实现假设 curr_world 和 curr_sector 一定在 self.tree 中，
+    # 但有些 persona 的空间记忆并不包含例如 "Town Hall" 这样的扇区，
+    # 从而触发 KeyError。这里做健壮化处理：如果缺失，则返回空串，
+    # 让上层 GPT 提示中直接跳过这些扇区。
+    world_tree = self.tree.get(curr_world)
+    if not world_tree:
+      return ""
+
+    sector_tree = world_tree.get(curr_sector)
+    if not sector_tree:
+      return ""
+
+    x = ", ".join(list(sector_tree.keys()))
     return x
 
 
@@ -98,14 +111,29 @@ class MemoryTree:
     """
     curr_world, curr_sector, curr_arena = arena.split(":")
 
-    if not curr_arena: 
+    if not curr_arena:
       return ""
 
-    try: 
-      x = ", ".join(list(self.tree[curr_world][curr_sector][curr_arena]))
-    except: 
-      x = ", ".join(list(self.tree[curr_world][curr_sector][curr_arena.lower()]))
-    return x
+    # 有些 DeepSeek 输出的扇区/房间（例如 "Town Hall"）可能不在
+    # persona 的空间记忆树中。原始实现直接索引 self.tree[...] 会
+    # 抛出 KeyError，导致整个仿真循环中断。这里做健壮化处理：
+    # 如果 world/sector/arena 任一缺失，则返回空串，让上层逻辑走
+    # 自己的 fail-safe，而不是崩溃。
+    world_tree = self.tree.get(curr_world)
+    if not world_tree:
+      return ""
+
+    sector_tree = world_tree.get(curr_sector)
+    if not sector_tree:
+      return ""
+
+    arena_tree = sector_tree.get(curr_arena)
+    if arena_tree is None:
+      arena_tree = sector_tree.get(curr_arena.lower())
+      if arena_tree is None:
+        return ""
+
+    return ", ".join(list(arena_tree))
 
 
 if __name__ == '__main__':

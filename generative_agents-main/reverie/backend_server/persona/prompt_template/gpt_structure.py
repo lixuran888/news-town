@@ -209,20 +209,29 @@ def GPT_request(prompt, gpt_parameter):
     a str of GPT-3's response. 
   """
   temp_sleep()
-  try: 
-    response = openai.Completion.create(
-                model=gpt_parameter["engine"],
-                prompt=prompt,
-                temperature=gpt_parameter["temperature"],
-                max_tokens=gpt_parameter["max_tokens"],
-                top_p=gpt_parameter["top_p"],
-                frequency_penalty=gpt_parameter["frequency_penalty"],
-                presence_penalty=gpt_parameter["presence_penalty"],
-                stream=gpt_parameter["stream"],
-                stop=gpt_parameter["stop"],)
-    return response.choices[0].text
-  except: 
-    print ("TOKEN LIMIT EXCEEDED")
+
+  # 为适配 DeepSeek 的 OpenAI 兼容接口，这里统一通过 ChatCompletion
+  # 调用 deepseek-chat，而不再使用旧的 Completion.create/text-davinci-003。
+  # 同时对 prompt 做一次简单截断，避免极端长文本直接触发 token 上限。
+  if isinstance(prompt, str):
+    max_chars = 8000  # 粗略字符上限，对应大致的 token 限制
+    if len(prompt) > max_chars:
+      # 保留开头的指令、人设和格式说明，截断末尾冗长部分。
+      prompt = prompt[:max_chars]
+
+  try:
+    completion = openai.ChatCompletion.create(
+      model="deepseek-chat",
+      messages=[{"role": "user", "content": prompt}],
+      max_tokens=gpt_parameter.get("max_tokens", 128),
+      temperature=gpt_parameter.get("temperature", 0.7),
+      top_p=gpt_parameter.get("top_p", 1),
+    )
+    return completion["choices"][0]["message"]["content"]
+  except Exception as e:
+    # 兼容旧日志格式，同时输出真实异常信息，便于后续排查。
+    print("TOKEN LIMIT EXCEEDED")
+    print(f"[DeepSeek ERROR] {e}")
     return "TOKEN LIMIT EXCEEDED"
 
 
@@ -256,7 +265,7 @@ def generate_prompt(curr_input, prompt_lib_file):
 
 def safe_generate_response(prompt, 
                            gpt_parameter,
-                           repeat=5,
+                           repeat=1,
                            fail_safe_response="error",
                            func_validate=None,
                            func_clean_up=None,
@@ -264,8 +273,23 @@ def safe_generate_response(prompt,
   if verbose: 
     print (prompt)
 
+  # 为了避免在 DeepSeek 频繁报错时长时间卡住，这里强制只请求一次。
+  # 即便上层传入更大的 repeat，也会被限制为 1。
+  repeat = 1
+
   for i in range(repeat): 
     curr_gpt_response = GPT_request(prompt, gpt_parameter)
+
+    # 统一过滤 DeepSeek 返回的错误字符串，避免污染世界线。
+    # 一旦检测到错误，立刻降级到 fail_safe_response，并明确打印日志。
+    if isinstance(curr_gpt_response, str) and (
+        "TOKEN LIMIT EXCEEDED" in curr_gpt_response or
+        "DeepSeek API ERROR" in curr_gpt_response
+    ):
+      print("[LLM FILTER] TOKEN LIMIT EXCEEDED / DeepSeek API ERROR, "
+            "downgrade to fail_safe_response")
+      return fail_safe_response
+
     if func_validate(curr_gpt_response, prompt=prompt): 
       return func_clean_up(curr_gpt_response, prompt=prompt)
     if verbose: 

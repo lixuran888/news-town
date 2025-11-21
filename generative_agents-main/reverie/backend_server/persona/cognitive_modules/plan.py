@@ -268,7 +268,22 @@ def generate_action_event_triple(act_desp, persona):
 
 def generate_act_obj_desc(act_game_object, act_desp, persona): 
   if debug: print ("GNS FUNCTION: <generate_act_obj_desc>")
-  return run_gpt_prompt_act_obj_desc(act_game_object, act_desp, persona)[0]
+  # 原始实现直接索引 [0]，在底层 GPT / API 失败时会返回 None，
+  # 导致 "NoneType object is not subscriptable"。这里加一层稳健包装。
+  desc = None
+  try:
+    resp = run_gpt_prompt_act_obj_desc(act_game_object, act_desp, persona)
+    if resp:
+      desc = resp[0]
+  except Exception:
+    desc = None
+
+  if not desc:
+    # 简单的本地 fallback，不依赖外部模型，保证仿真不中断。
+    obj = act_game_object if act_game_object and act_game_object != "<random>" else "an object"
+    desc = f"{persona.scratch.name} is {act_desp} using {obj}"
+
+  return desc
 
 
 def generate_act_obj_event_triple(act_game_object, act_obj_desc, persona): 

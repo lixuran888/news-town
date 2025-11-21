@@ -27,6 +27,7 @@ import math
 import os
 import shutil
 import traceback
+import webbrowser
 
 from selenium import webdriver
 
@@ -34,7 +35,10 @@ from global_methods import *
 from utils import *
 from maze import *
 from persona.persona import *
-from expert_init import inject_food_poisoning_event
+from expert_init import (
+  inject_food_poisoning_event,
+  generate_and_broadcast_public_opinion,
+)
 
 ##############################################################################
 #                                  REVERIE                                   #
@@ -80,8 +84,11 @@ class ReverieServer:
     with open(f"{sim_folder}/reverie/meta.json") as json_file:  
       reverie_meta = json.load(json_file)
 
+    # Fork 出新世界线时，不仅要记录 fork_sim_code，
+    # 还要把 step 重置为 0，确保从 environment/0.json 开始推进。
+    reverie_meta["fork_sim_code"] = fork_sim_code
+    reverie_meta["step"] = 0
     with open(f"{sim_folder}/reverie/meta.json", "w") as outfile: 
-      reverie_meta["fork_sim_code"] = fork_sim_code
       outfile.write(json.dumps(reverie_meta, indent=2))
 
     # LOADING REVERIE'S GLOBAL VARIABLES
@@ -111,6 +118,8 @@ class ReverieServer:
     # <step> denotes the number of steps that our game has taken. A step here
     # literally translates to the number of moves our personas made in terms
     # of the number of tiles. 
+    # 这里使用我们在上面刚写回 meta.json 的 step（已被强制设为 0），
+    # 避免继承旧世界的大 step 值导致无法找到对应 environment/<step>.json。
     self.step = reverie_meta['step']
 
     # SETTING UP PERSONAS IN REVERIE
@@ -142,10 +151,48 @@ class ReverieServer:
     init_env_file = f"{sim_folder}/environment/{str(self.step)}.json"
     init_env = json.load(open(init_env_file))
     for persona_name in reverie_meta['persona_names']: 
+      # 在某些场景下，meta.json 中列出的 persona 可能尚未在
+      # environment/0.json 中配置初始位置（例如刚新增的专家）。
+      # 为避免 KeyError，这里如果 init_env 中没有该 persona，就跳过。
+      if persona_name not in init_env:
+        continue
+
       persona_folder = f"{sim_folder}/personas/{persona_name}"
       p_x = init_env[persona_name]["x"]
       p_y = init_env[persona_name]["y"]
       curr_persona = Persona(persona_name, persona_folder)
+
+      # 每次 fork 新世界时，只继承身份和长期记忆，
+      # 但当天状态 / 日程不应沿用旧世界，否则会出现“整天睡觉”的计划。
+      # 因此这里显式重置与“今天”相关的 scratch 状态，让新世界从当前
+      # Reverie 的 curr_time 作为一个全新的 "First day" 重新规划日程。
+      s = curr_persona.scratch
+      s.curr_time = None
+      s.daily_plan_req = None
+      s.daily_req = []
+      s.f_daily_schedule = []
+      s.f_daily_schedule_hourly_org = []
+
+      # 同时清空正在进行中的动作、路径和对话，让人物从一个干净的
+      # 状态开始新一天的行动。
+      s.act_address = None
+      s.act_start_time = None
+      s.act_duration = None
+      s.act_description = None
+      s.act_pronunciatio = None
+      s.act_event = (s.name, None, None)
+
+      s.act_obj_description = None
+      s.act_obj_pronunciatio = None
+      s.act_obj_event = (s.name, None, None)
+
+      s.chatting_with = None
+      s.chat = None
+      s.chatting_with_buffer = dict()
+      s.chatting_end_time = None
+
+      s.act_path_set = False
+      s.planned_path = []
 
       # 在初始化时为每个 persona 注入一次校园食物中毒事件的长期记忆
       inject_food_poisoning_event(curr_persona, self.curr_time)
@@ -175,6 +222,20 @@ class ReverieServer:
     curr_step["step"] = self.step
     with open(f"{fs_temp_storage}/curr_step.json", "w") as outfile: 
       outfile.write(json.dumps(curr_step, indent=2))
+
+    # 尝试在本机浏览器中自动打开前端页面，方便直接查看仿真结果。
+    # （已改为仅由 run_project_autotick.bat 在外部打开一次浏览器，
+    #  避免重复打开多个 home 窗口。如果需要恢复自动打开功能，可以
+    #  去掉下面这段注释。）
+    # try:
+    #   webbrowser.open("http://127.0.0.1:8000")
+    #   webbrowser.open("http://127.0.0.1:8000/simulator_home")
+    # except Exception:
+    #   # 打不开浏览器不影响后端主循环
+    #   pass
+
+    # 记录上一次为专家生成民众舆论摘要的日期，避免同一天重复生成多次。
+    self.last_public_opinion_date = None
 
 
   def save(self): 
@@ -337,6 +398,8 @@ class ReverieServer:
       # the content of this for loop. Otherwise, we just wait. 
       curr_env_file = f"{sim_folder}/environment/{self.step}.json"
       if check_if_file_exists(curr_env_file):
+        if debug:
+          print(f"[DEBUG] Found environment file for step {self.step}: {curr_env_file}")
         # If we have an environment file, it means we have a new perception
         # input to our personas. So we first retrieve it.
         try: 
@@ -433,13 +496,32 @@ class ReverieServer:
           #  "persona": {"Klaus Mueller": {"movement": [38, 12]}}, 
           #  "meta": {curr_time: <datetime>}}
           curr_move_file = f"{sim_folder}/movement/{self.step}.json"
-          with open(curr_move_file, "w") as outfile: 
-            outfile.write(json.dumps(movements, indent=2))
+          try:
+            with open(curr_move_file, "w") as outfile: 
+              outfile.write(json.dumps(movements, indent=2))
+            if debug:
+              print(f"[DEBUG] Wrote movement file: {curr_move_file}")
+          except Exception as e:
+            print(f"[ERROR] Failed to write movement file {curr_move_file}: {e}")
 
           # After this cycle, the world takes one step forward, and the 
           # current time moves by <sec_per_step> amount. 
           self.step += 1
           self.curr_time += datetime.timedelta(seconds=self.sec_per_step)
+
+          # 在每天 23:00 触发一次：从平民聊天中汇总舆论，并写入专家长期记忆。
+          try:
+            if self.curr_time.hour == 23:
+              curr_date = self.curr_time.date()
+              if self.last_public_opinion_date != curr_date:
+                generate_and_broadcast_public_opinion(
+                  self.personas,
+                  self.curr_time,
+                )
+                self.last_public_opinion_date = curr_date
+          except Exception:
+            # 不让舆论模块的异常影响主循环
+            pass
 
           int_counter -= 1
           
@@ -550,27 +632,30 @@ class ReverieServer:
           # Print the associative memory (event) of the persona specified in
           # the prompt
           # Ex: print persona associative memory (event) Isabella Rodriguez
-          ret_str += f'{self.personas[" ".join(sim_command.split()[-2:])]}\n'
-          ret_str += (self.personas[" ".join(sim_command.split()[-2:])]
-                                       .a_mem.get_str_seq_events())
+          prefix = "print persona associative memory (event)"
+          persona_name = sim_command[len(prefix):].strip()
+          ret_str += f'{self.personas[persona_name]}\n'
+          ret_str += self.personas[persona_name].a_mem.get_str_seq_events()
 
         elif ("print persona associative memory (thought)" 
               in sim_command.lower()): 
           # Print the associative memory (thought) of the persona specified in
           # the prompt
           # Ex: print persona associative memory (thought) Isabella Rodriguez
-          ret_str += f'{self.personas[" ".join(sim_command.split()[-2:])]}\n'
-          ret_str += (self.personas[" ".join(sim_command.split()[-2:])]
-                                       .a_mem.get_str_seq_thoughts())
+          prefix = "print persona associative memory (thought)"
+          persona_name = sim_command[len(prefix):].strip()
+          ret_str += f'{self.personas[persona_name]}\n'
+          ret_str += self.personas[persona_name].a_mem.get_str_seq_thoughts()
 
         elif ("print persona associative memory (chat)" 
               in sim_command.lower()): 
           # Print the associative memory (chat) of the persona specified in
           # the prompt
           # Ex: print persona associative memory (chat) Isabella Rodriguez
-          ret_str += f'{self.personas[" ".join(sim_command.split()[-2:])]}\n'
-          ret_str += (self.personas[" ".join(sim_command.split()[-2:])]
-                                       .a_mem.get_str_seq_chats())
+          prefix = "print persona associative memory (chat)"
+          persona_name = sim_command[len(prefix):].strip()
+          ret_str += f'{self.personas[persona_name]}\n'
+          ret_str += self.personas[persona_name].a_mem.get_str_seq_chats()
 
         elif ("print persona spatial memory" 
               in sim_command.lower()): 

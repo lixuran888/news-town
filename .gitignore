@@ -1,32 +1,41 @@
 # Python bytecode and cache
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
 
 # Virtual environments
 venv/
 .env/
 .venv/
 
-# Editor / IDE configs
+# OS / editor files
+.DS_Store
+Thumbs.db
 .vscode/
 .idea/
 
+# Anaconda environment directories (do not commit local envs)
+envs/
+
 # Logs
-logs/
 *.log
 
-# Jupyter checkpoints
-.ipynb_checkpoints/
+# Django / SQLite databases
+*.sqlite3
 
-# Runtime simulation data (auto_run worlds)
-environment/frontend_server/storage/
+# Local environment config (if any)
+.env.local
+.env.*.local
 
-# Django / static runtime outputs (if any)
-staticfiles/
-media/
+# Simulation storage outputs (keep base templates, ignore auto_run worlds)
+environment/frontend_server/storage/auto_run_*/
 
-# OS-specific
-.DS_Store
-Thumbs.db
+# Temp storage used by frontend
+environment/frontend_server/temp_storage/
+
+# Reverie runtime artifacts
+**/reverie/backend_server/__pycache__/
+
+# If you ever export checkpoints or large debug dumps, ignore them
+checkpoints/
+dumps/
