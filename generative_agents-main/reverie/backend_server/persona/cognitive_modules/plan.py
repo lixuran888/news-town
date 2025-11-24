@@ -192,8 +192,64 @@ def generate_action_sector(act_desp, persona, maze):
     action_arena (e.g., "bedroom 2")
   EXAMPLE OUTPUT: 
     "bedroom 2"
-  """
+  """ 
   if debug: print ("GNS FUNCTION: <generate_action_sector>")
+
+  # 对几个关键的社交活动，直接将人物硬性放到统一的公共区域，
+  # 以提高他们在早餐 / 午餐 / 晚上相遇并对话的概率。
+  text = act_desp.lower()
+  if "having breakfast and chatting at the campus cafe" in text:
+    # 统一到 Hobbs Cafe
+    return "Hobbs Cafe"
+  if "having lunch together at the campus cafeteria" in text:
+    # 统一到 Oak Hill College（校园教学区），用作“食堂”近似
+    return "Oak Hill College"
+  if "relaxing and talking with friends at the town square" in text:
+    # 统一到 Johnson Park，作为镇中心广场的近似公共空间
+    return "Johnson Park"
+
+  # 对于三位学生人物，当日程文本本身已经明显指向某类地点时，
+  # 在这里做一层本地规则，尽量减少 GPT 对地点判断的影响。
+  name = getattr(persona.scratch, "name", persona.name)
+  student_set = {"Isabella Rodriguez", "Maria Lopez", "Klaus Mueller"}
+  if name in student_set:
+    # 睡觉 / 上床 → 学生宿舍
+    if ("sleep" in text) or ("in bed" in text):
+      return "Dorm for Oak Hill College"
+
+    # 明确是学习、上课、做研究 → Oak Hill College
+    study_kw = ["class", "lecture", "seminar", "library", "study", 
+                "studying", "research", "paper", "assignment"]
+    if any(kw in text for kw in study_kw):
+      return "Oak Hill College"
+
+    # 明确是去咖啡馆 / 喝咖啡 → Hobbs Cafe
+    cafe_kw = ["hobbs cafe", "coffee", "cafe", "breakfast at the cafe"]
+    if any(kw in text for kw in cafe_kw):
+      return "Hobbs Cafe"
+
+    # 散步 / 在公园活动 → Johnson Park
+    park_kw = ["walk in the park", "walking in the park", "at the park",
+               "johnson park"]
+    if any(kw in text for kw in park_kw):
+      return "Johnson Park"
+
+    # 去酒吧 / pub → The Rose and Crown Pub
+    pub_kw = ["the rose and crown pub", "pub", "bar", "having a drink"]
+    if any(kw in text for kw in pub_kw):
+      return "The Rose and Crown Pub"
+
+    # 购物 / 药店 / market → The Willows Market and Pharmacy
+    market_kw = ["market", "pharmacy", "groceries", "grocery"]
+    if any(kw in text for kw in market_kw):
+      return "The Willows Market and Pharmacy"
+
+    # 购买用品 / supply store → Harvey Oak Supply Store
+    supply_kw = ["harvey oak supply store", "supplies", "hardware store"]
+    if any(kw in text for kw in supply_kw):
+      return "Harvey Oak Supply Store"
+
+  # 其余模糊场景，仍然交给 GPT 决定 sector。
   return run_gpt_prompt_action_sector(act_desp, persona, maze)[0]
 
 
@@ -212,6 +268,19 @@ def generate_action_arena(act_desp, persona, maze, act_world, act_sector):
     "bedroom 2"
   """
   if debug: print ("GNS FUNCTION: <generate_action_arena>")
+
+  # 对三位学生人物，当行为是睡觉 / 在床上时，直接将 arena 
+  # 绑定到各自的房间，避免模型把睡觉安排在 garden / common room。
+  text = act_desp.lower()
+  name = getattr(persona.scratch, "name", persona.name)
+  if ("sleep" in text) or ("in bed" in text):
+    if name == "Klaus Mueller":
+      return "Klaus Mueller's room"
+    if name == "Maria Lopez":
+      return "Maria Lopez's room"
+    if name == "Isabella Rodriguez":
+      return "Isabella Rodriguez's room"
+
   return run_gpt_prompt_action_arena(act_desp, persona, maze, act_world, act_sector)[0]
 
 
@@ -493,6 +562,119 @@ def revise_identity(persona):
   persona.scratch.daily_plan_req = new_daily_req
 
 
+def _seed_public_health_expert_food_poisoning_memory(persona):
+  name = getattr(persona.scratch, "name", persona.name)
+  if name != "Public Health Expert":
+    return
+  if getattr(persona.scratch, "_seeded_food_poisoning_case", False):
+    return
+  created = persona.scratch.curr_time or datetime.datetime(2025, 7, 8)
+  expiration = created + datetime.timedelta(days=365)
+  s = persona.scratch.name
+  p = "prior_case"
+  o = "food_poisoning_tianshui_kindergarten"
+  base_keywords = set(["food_poisoning", "kindergarten", "lead", "children"])
+
+  texts = [
+    "我清楚记得，甘肃天水的一所幼儿园，为了让孩子的餐食看起来更鲜艳，长期在食物中违规使用工业彩绘颜料，结果导致大规模儿童血铅异常。",
+    "在那起天水事件中，玉米卷肠包和三色红枣发糕等食品里铅含量极度超标，很多孩子出现乏力、肚子痛、情绪激动、注意力难集中等症状，这种慢性铅暴露对儿童神经系统发育有长期不可逆的风险。",
+    "那次事件暴露出学校食堂管理失守、食品原料采购审核流于形式、食品留样和冷链制度执行不严，以及当地监管部门在家长反映异常后的应急响应迟缓等一系列问题。",
+    "我也记得，当时官方通报一度被质疑只想把责任全部推给幼儿园，家长对检测流程和结果公正性非常不信任，这说明在食品安全事件中，及时透明的信息公开与对家长关切的回应与医学救治同样重要。",
+  ]
+
+  for text in texts:
+    thought = text
+    keywords = set(list(base_keywords))
+    thought_poignancy = 8
+    thought_embedding_pair = (thought, get_embedding(thought))
+    persona.a_mem.add_thought(
+      created,
+      expiration,
+      s,
+      p,
+      o,
+      thought,
+      keywords,
+      thought_poignancy,
+      thought_embedding_pair,
+      None,
+    )
+
+  persona.scratch._seeded_food_poisoning_case = True
+
+
+def _seed_civilians_food_poisoning_news_memory(persona):
+  name = getattr(persona.scratch, "name", persona.name)
+  if name not in {"Isabella Rodriguez", "Klaus Mueller", "Maria Lopez"}:
+    return
+  if getattr(persona.scratch, "_seeded_food_poisoning_news", False):
+    return
+
+  created = persona.scratch.curr_time or datetime.datetime(2025, 7, 8)
+  expiration = created + datetime.timedelta(days=365)
+  s = persona.scratch.name
+  p = "news"
+  o = "food_poisoning_tianshui_kindergarten"
+
+  def _add_thought(text, extra_keywords=None, poignancy=7):
+    base_keywords = {"food_poisoning", "news", "kindergarten", "lead"}
+    if extra_keywords:
+      base_keywords.update(extra_keywords)
+    keywords = set(base_keywords)
+    thought = text
+    thought_embedding_pair = (thought, get_embedding(thought))
+    persona.a_mem.add_thought(
+      created,
+      expiration,
+      s,
+      p,
+      o,
+      thought,
+      keywords,
+      poignancy,
+      thought_embedding_pair,
+      None,
+    )
+
+  if name == "Isabella Rodriguez":
+    _add_thought(
+      "最近有新闻说，甘肃天水的一所幼儿园因为在孩子吃的糕点里加了工业彩绘颜料，导致很多幼儿血铅异常。我一想到那家园子的餐食也是每天像我们咖啡馆一样端到孩子面前，就觉得后背发凉。",
+      extra_keywords={"cafe", "customers", "parents"},
+      poignancy=7,
+    )
+    _add_thought(
+      "看到那起幼儿园食物中毒事件后，我开始更加留意 Hobbs Cafe 的食材来源和卫生细节，也会和学生和家长聊起这件事，希望他们在这里至少能感觉到安全和被照顾。",
+      extra_keywords={"hobbs", "hygiene", "safety"},
+      poignancy=6,
+    )
+
+  if name == "Klaus Mueller":
+    _add_thought(
+      "我在新闻里看到了甘肃天水那家幼儿园的铅中毒事件，孩子们只是吃了看起来更好看的点心，却被迫承担制度和监管失灵的代价，这让我再次意识到弱势群体在公共决策中的话语有多么微弱。",
+      extra_keywords={"social_justice", "inequality"},
+      poignancy=8,
+    )
+    _add_thought(
+      "那起幼儿园食物中毒事件中，园长、监管部门、检测机构之间互相推诿的报道，让我想到自己关于绅士化和结构性不公的研究：当制度优先考虑效率和面子时，受伤的总是那些没有议价能力的人。",
+      extra_keywords={"research", "gentrification"},
+      poignancy=7,
+    )
+
+  if name == "Maria Lopez":
+    _add_thought(
+      "刷社交媒体的时候，我看到好多关于甘肃天水一所幼儿园食物中毒的帖子和视频，孩子们因为工业颜料导致血铅超标，评论区全是愤怒和心碎的表情，我一边看一边觉得很难受。",
+      extra_keywords={"social_media", "stream", "emotion"},
+      poignancy=7,
+    )
+    _add_thought(
+      "我在直播时也提到那起幼儿园食物中毒事件，弹幕里有人说这是监管问题，有人说是资本逐利害的，又有人说不要传播负面情绪。我意识到，哪怕是在游戏直播里，大家也会带着对现实世界不安全感的情绪进来。",
+      extra_keywords={"twitch", "chat", "audience"},
+      poignancy=6,
+    )
+
+  persona.scratch._seeded_food_poisoning_news = True
+
+
 def _long_term_planning(persona, new_day): 
   """
   Formulates the persona's daily long-term plan if it is the start of a new 
@@ -505,6 +687,12 @@ def _long_term_planning(persona, new_day):
   """
   # We start by creating the wake up hour for the persona. 
   wake_up_hour = generate_wake_up_hour(persona)
+
+  name = getattr(persona.scratch, "name", persona.name)
+  if new_day == "First day":
+    if name == "Public Health Expert":
+      _seed_public_health_expert_food_poisoning_memory(persona)
+    _seed_civilians_food_poisoning_news_memory(persona)
 
   # When it is a new day, we start by creating the daily_req of the persona.
   # Note that the daily_req is a list of strings that describe the persona's
