@@ -123,6 +123,14 @@ def run_gpt_prompt_wake_up_hour(persona, test_input=None, verbose=False):
   OUTPUT: 
     integer for the wake up hour.
   """
+  # 简单缓存：如果 scratch 上已经有 wake_up_hour，则直接复用，避免重复调用 LLM。
+  try:
+    cached_wake = getattr(persona.scratch, "wake_up_hour", None)
+  except Exception:
+    cached_wake = None
+  if cached_wake is not None and test_input is None:
+    return cached_wake, [cached_wake, None, None, None, None]
+
   def create_prompt_input(persona, test_input=None): 
     if test_input: return test_input
     prompt_input = [persona.scratch.get_str_iss(),
@@ -154,6 +162,12 @@ def run_gpt_prompt_wake_up_hour(persona, test_input=None, verbose=False):
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
   
+  # 将 wake_up_hour 结果写回 scratch，便于后续直接复用。
+  try:
+    setattr(persona.scratch, "wake_up_hour", output)
+  except Exception:
+    pass
+
   if debug or verbose: 
     print_run_prompts(prompt_template, persona, gpt_param, 
                       prompt_input, prompt, output)
@@ -177,6 +191,17 @@ def run_gpt_prompt_daily_plan(persona,
   OUTPUT: 
     a list of daily actions in broad strokes.
   """
+  # 简单缓存：如果 scratch 上已经有 daily_req，则直接使用，不再重复调用 LLM。
+  try:
+    existing_daily = getattr(persona.scratch, "daily_req", None)
+  except Exception:
+    existing_daily = None
+  if test_input is None and existing_daily:
+    # 保持与原函数相同的返回结构：在前面补上 wake_up_hour 这一条
+    cached_output = ([f"wake up and complete the morning routine at {wake_up_hour}:00 am"]
+                     + list(existing_daily))
+    return cached_output, [cached_output, None, None, None, existing_daily]
+
   def create_prompt_input(persona, wake_up_hour, test_input=None):
     if test_input: return test_input
     prompt_input = []
@@ -227,6 +252,12 @@ def run_gpt_prompt_daily_plan(persona,
                                    __func_validate, __func_clean_up)
   output = ([f"wake up and complete the morning routine at {wake_up_hour}:00 am"]
               + output)
+
+  # 将 daily_plan 结果写回 scratch，便于后续直接复用。
+  try:
+    setattr(persona.scratch, "daily_req", list(output))
+  except Exception:
+    pass
 
   if debug or verbose: 
     print_run_prompts(prompt_template, persona, gpt_param, 
@@ -362,40 +393,6 @@ def run_gpt_prompt_generate_hourly_schedule(persona,
     fs = "asleep"
     return fs
 
-  # # ChatGPT Plugin ===========================================================
-  # def __chat_func_clean_up(gpt_response, prompt=""): ############
-  #   cr = gpt_response.strip()
-  #   if cr[-1] == ".":
-  #     cr = cr[:-1]
-  #   return cr
-
-  # def __chat_func_validate(gpt_response, prompt=""): ############
-  #   try: __func_clean_up(gpt_response, prompt="")
-  #   except: return False
-  #   return True
-
-  # print ("asdhfapsh8p9hfaiafdsi;ldfj as DEBUG 10") ########
-  # gpt_param = {"engine": "text-davinci-002", "max_tokens": 15, 
-  #              "temperature": 0, "top_p": 1, "stream": False,
-  #              "frequency_penalty": 0, "presence_penalty": 0, "stop": None}
-  # prompt_template = "persona/prompt_template/v3_ChatGPT/generate_hourly_schedule_v2.txt" ########
-  # prompt_input = create_prompt_input(persona, 
-  #                                    curr_hour_str, 
-  #                                    p_f_ds_hourly_org,
-  #                                    hour_str, 
-  #                                    intermission2,
-  #                                    test_input)  ########
-  # prompt = generate_prompt(prompt_input, prompt_template)
-  # example_output = "studying for her music classes" ########
-  # special_instruction = "The output should ONLY include the part of the sentence that completes the last line in the schedule above." ########
-  # fail_safe = get_fail_safe() ########
-  # output = ChatGPT_safe_generate_response(prompt, example_output, special_instruction, 3, fail_safe,
-  #                                         __chat_func_validate, __chat_func_clean_up, True)
-  # if output != False: 
-  #   return output, [output, prompt, gpt_param, prompt_input, fail_safe]
-  # # ChatGPT Plugin ===========================================================
-
-
   gpt_param = {"engine": "text-davinci-003", "max_tokens": 30, 
                "temperature": 0.5, "top_p": 1, "stream": False,
                "frequency_penalty": 0, "presence_penalty": 0, "stop": ["\n"]}
@@ -412,6 +409,12 @@ def run_gpt_prompt_generate_hourly_schedule(persona,
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
   
+  # 首次成功调用后，将结果缓存在 scratch 上，供后续复用。
+  try:
+    setattr(persona.scratch, "wake_up_hour", output)
+  except Exception:
+    pass
+
   if debug or verbose: 
     print_run_prompts(prompt_template, persona, gpt_param, 
                       prompt_input, prompt, output)
