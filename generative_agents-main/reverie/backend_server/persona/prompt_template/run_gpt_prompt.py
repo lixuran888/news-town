@@ -304,15 +304,59 @@ def run_gpt_prompt_generate_hourly_schedule(persona,
     return prompt_input
 
   def __func_clean_up(gpt_response, prompt=""):
-    cr = gpt_response.strip()
-    if cr[-1] == ".":
-      cr = cr[:-1]
-    return cr
+    """Extract a concise activity phrase from a possibly verbose response.
+
+    DeepSeek 有时会返回整段总结或完整日程表，而不是只补全一行。
+    这里尽量从中提取“最后一条 Activity 行”的补全部分：
+
+      [date -- HH:MM] Activity: <firstname> is ...
+
+    如果找不到 Activity 关键字，则退回整个响应的简化版本。
+    """
+    if gpt_response is None:
+      return ""
+
+    text = str(gpt_response).strip()
+    if not text:
+      return ""
+
+    lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
+    activity_lines = [ln for ln in lines if "Activity:" in ln]
+
+    target = None
+    if activity_lines:
+      # Prefer the last Activity line in case there's a full schedule above.
+      target = activity_lines[-1]
+    else:
+      # Fallback: try the last non-empty line.
+      target = lines[-1] if lines else text
+
+    # Cut off everything before "Activity:" so we only keep the phrase after it.
+    if "Activity:" in target:
+      target = target.split("Activity:", 1)[-1].strip()
+
+    # 通常格式是 "<firstname> is ..."，我们只保留动词短语部分。
+    # 如果找不到 " is "，就返回整句。
+    lowered = target.lower()
+    if " is " in lowered:
+      # 对应位置切分，而不是简单用原始 target 的 first " is ".
+      # 为简化，这里直接在原始字符串上 split(" is ", 1)。
+      parts = target.split(" is ", 1)
+      if len(parts) == 2 and parts[1].strip():
+        target = parts[1].strip()
+
+    # 去掉句末多余的句号。
+    if target.endswith("."):
+      target = target[:-1].strip()
+
+    return target
 
   def __func_validate(gpt_response, prompt=""): 
-    try: __func_clean_up(gpt_response, prompt="")
-    except: return False
-    return True
+    try:
+      cleaned = __func_clean_up(gpt_response, prompt="")
+      return bool(cleaned.strip())
+    except Exception:
+      return False
 
   def get_fail_safe(): 
     fs = "asleep"
