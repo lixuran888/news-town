@@ -302,10 +302,51 @@ def run_gpt_prompt_generate_hourly_schedule(persona,
         f"strongly pre-planned commitments."
       )
 
+    def _clean_prior_hourly(org_list):
+      """Filter out overly long / explanatory sentences from prior schedule.
+
+      DeepSeek 有时会在 hourly schedule 中塞入整段说明文字，例如：
+      "根据您提供的角色设定...完整小时制日程安排"。
+      这些句子如果原样作为历史再写回 prompt，会造成大量重复和
+      token 浪费。这里做一个非常保守的过滤：
+
+      - 丢弃特别长的行（例如长度 > 120 字符）；
+      - 丢弃包含若干典型说明类关键词的行；
+      - 保留其它简短的 "X is doing Y" 这类真正的活动描述。
+      """
+      if not org_list:
+        return []
+
+      filtered = []
+      ban_keywords = [
+        "完整小时制日程安排",
+        "根据您提供的角色设定",
+        "这里为您补全并修正",
+        "这是根据您提供的角色设定",
+        "完整且符合人设的日程安排",
+      ]
+      max_len = 120
+
+      for text in org_list:
+        if not isinstance(text, str):
+          text = str(text)
+        t = text.strip()
+        if not t:
+          continue
+        if len(t) > max_len:
+          continue
+        if any(kw in t for kw in ban_keywords):
+          continue
+        filtered.append(t)
+      return filtered
+
     prior_schedule = ""
     if p_f_ds_hourly_org: 
+      cleaned_org = _clean_prior_hourly(p_f_ds_hourly_org)
       prior_schedule = ""
-      for count, i in enumerate(p_f_ds_hourly_org): 
+      for count, i in enumerate(cleaned_org): 
+        if count >= len(hour_str):
+          break
         prior_schedule += f"[(ID:{get_random_alphanumeric()})" 
         prior_schedule += f" {persona.scratch.get_str_curr_date_str()} --"
         prior_schedule += f" {hour_str[count]}] Activity:"

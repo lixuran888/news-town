@@ -88,6 +88,14 @@ class ReverieServer:
     # 还要把 step 重置为 0，确保从 environment/0.json 开始推进。
     reverie_meta["fork_sim_code"] = fork_sim_code
     reverie_meta["step"] = 0
+
+    # 约定：只要是从 base_the_ville_clean fork 出来的世界线，
+    # 第一日的 curr_time 一律从早上 08:00:00 开始。后续仍按
+    # sec_per_step 正常推进 24 小时，不受影响。
+    if reverie_meta.get("fork_sim_code") == "base_the_ville_clean":
+      date_str = reverie_meta.get("start_date", "February 13, 2023")
+      reverie_meta["curr_time"] = f"{date_str}, 08:00:00"
+
     with open(f"{sim_folder}/reverie/meta.json", "w") as outfile: 
       outfile.write(json.dumps(reverie_meta, indent=2))
 

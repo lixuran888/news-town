@@ -35,7 +35,20 @@ def generate_wake_up_hour(persona):
     8
   """
   if debug: print ("GNS FUNCTION: <generate_wake_up_hour>")
-  return int(run_gpt_prompt_wake_up_hour(persona)[0])
+
+  wake_raw = int(run_gpt_prompt_wake_up_hour(persona)[0])
+
+  # For the three main student personas, gently clamp wake-up time so that
+  # they do not sleep too late into the morning. This keeps the world more
+  # active and creates a longer window for encounters and conversations.
+  name = getattr(persona.scratch, "name", persona.name)
+  early_risers = {"Isabella Rodriguez", "Maria Lopez", "Klaus Mueller"}
+  if name in early_risers:
+    # Ensure they wake up no later than 7am, but never before 5am to avoid
+    # unrealistic schedules if the model outputs extreme values.
+    wake_raw = max(5, min(7, wake_raw))
+
+  return wake_raw
 
 
 def generate_first_daily_plan(persona, wake_up_hour): 
@@ -515,6 +528,80 @@ def _long_term_planning(persona, new_day):
   # add up to 24 hours.
   persona.scratch.f_daily_schedule = generate_hourly_schedule(persona, 
                                                               wake_up_hour)
+
+  # For the three main student personas, softly enforce a few daily
+  # "meeting" blocks at shared public locations to increase the chance of
+  # encounters and conversations:
+  # - Breakfast at the cafe around 8:009:00
+  # - Lunch at the campus cafeteria around 12:0013:00
+  # - Evening at the town square around 19:0020:00
+  def _min_to_idx_pairs(schedule):
+    pairs = []
+    curr_start = 0
+    for idx, (_, dur) in enumerate(schedule):
+      curr_end = curr_start + dur
+      pairs.append((idx, curr_start, curr_end))
+      curr_start = curr_end
+    return pairs
+
+  def _override_window(schedule, win_start_min, win_end_min, desc):
+    if not schedule:
+      return schedule
+    pairs = _min_to_idx_pairs(schedule)
+    new_sched = []
+    inserted = False
+    for idx, s, e in pairs:
+      act, dur = schedule[idx]
+      # completely before window
+      if e <= win_start_min or s >= win_end_min:
+        new_sched.append([act, dur])
+        continue
+      # overlapping: cut into up to three segments
+      if s < win_start_min:
+        new_sched.append([act, win_start_min - s])
+      if not inserted:
+        new_sched.append([desc, max(0, win_end_min - win_start_min)])
+        inserted = True
+      if e > win_end_min:
+        new_sched.append([act, e - win_end_min])
+    # Compress adjacent identical activities
+    compressed = []
+    for act, dur in new_sched:
+      if dur <= 0:
+        continue
+      if compressed and compressed[-1][0] == act:
+        compressed[-1][1] += dur
+      else:
+        compressed.append([act, dur])
+    return compressed or schedule
+
+  name = getattr(persona.scratch, "name", persona.name)
+  meeting_personas = {"Isabella Rodriguez", "Maria Lopez", "Klaus Mueller"}
+  if name in meeting_personas:
+    sched = persona.scratch.f_daily_schedule
+    # Breakfast: 8:009:00 (48060 minutes)
+    sched = _override_window(
+      sched,
+      8 * 60,
+      9 * 60,
+      f"having breakfast and chatting at the campus cafe",
+    )
+    # Lunch: 12:0013:00 (720780 minutes)
+    sched = _override_window(
+      sched,
+      12 * 60,
+      13 * 60,
+      f"having lunch together at the campus cafeteria",
+    )
+    # Evening: 19:0020:00 (11401200 minutes)
+    sched = _override_window(
+      sched,
+      19 * 60,
+      20 * 60,
+      f"relaxing and talking with friends at the town square",
+    )
+    persona.scratch.f_daily_schedule = sched
+
   persona.scratch.f_daily_schedule_hourly_org = (persona.scratch
                                                    .f_daily_schedule[:])
 
@@ -758,6 +845,19 @@ def _should_react(persona, retrieved, personas):
     if (target_persona.name in init_persona.scratch.chatting_with_buffer): 
       if init_persona.scratch.chatting_with_buffer[target_persona.name] > 0: 
         return False
+
+    # Local "social hour" bias: when two personas are at the same location
+    # during key social windows, we give them an additional chance to start
+    # talking without relying solely on the LLM decision. This does not add
+    # any extra API calls and simply makes encounters more lively.
+    same_place = (init_persona.scratch.act_address 
+                  == target_persona.scratch.act_address)
+    hour = init_persona.scratch.curr_time.hour
+    social_hours = {8, 12, 13, 18, 19, 20}
+    if same_place and (hour in social_hours):
+      # Higher base probability during designated social hours.
+      if random.random() < 0.6:
+        return True
 
     if generate_decide_to_talk(init_persona, target_persona, retrieved): 
 
