@@ -196,10 +196,31 @@ def run_gpt_prompt_daily_plan(persona,
     existing_daily = getattr(persona.scratch, "daily_req", None)
   except Exception:
     existing_daily = None
+
+  # 为特定新增 agent 注入“早上去公共场所”的社交偏好，增强他们参与对话的机会。
+  # 这里不改动原有 LLM 规划，只是在其结果前面加一两条高优先级的目标。
+  special_morning_plans = {
+    "Abigail Chen": "visit Hobbs Cafe in the morning to socialize and get inspiration",
+    "Adam Smith": "spend the morning reading and chatting with others at Hobbs Cafe",
+    "Arthur Burton": "go to Hobbs Cafe in the morning to grab coffee and talk to people",
+    "Ayesha Khan": "study and meet classmates at the Oak Hill College garden or nearby cafe in the morning",
+    "Carlos Gomez": "have breakfast and chat with neighbors at Hobbs Cafe in the morning",
+    "Carmen Ortiz": "meet friends at Hobbs Cafe in the morning to talk about the day"
+  }
+
+  injected = []
+  if persona.name in special_morning_plans:
+    injected.append(special_morning_plans[persona.name])
+
   if test_input is None and existing_daily:
     # 保持与原函数相同的返回结构：在前面补上 wake_up_hour 这一条
+    base_list = list(existing_daily)
+    # 将特殊的早晨计划插入到缓存计划的最前面，避免重复注入。
+    for plan in reversed(injected):
+      if plan not in base_list:
+        base_list.insert(0, plan)
     cached_output = ([f"wake up and complete the morning routine at {wake_up_hour}:00 am"]
-                     + list(existing_daily))
+                     + base_list)
     return cached_output, [cached_output, None, None, None, existing_daily]
 
   def create_prompt_input(persona, wake_up_hour, test_input=None):
@@ -250,20 +271,25 @@ def run_gpt_prompt_daily_plan(persona,
 
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  output = ([f"wake up and complete the morning routine at {wake_up_hour}:00 am"]
-              + output)
+  # 将 wake-up 条目放在最前面
+  full_output = ([f"wake up and complete the morning routine at {wake_up_hour}:00 am"]
+                 + output)
+  # 在其后追加为特殊 agent 注入的“公共场所”早晨计划
+  for plan in injected:
+    if plan not in full_output:
+      full_output.insert(1, plan)
 
   # 将 daily_plan 结果写回 scratch，便于后续直接复用。
   try:
-    setattr(persona.scratch, "daily_req", list(output))
+    setattr(persona.scratch, "daily_req", list(full_output))
   except Exception:
     pass
 
   if debug or verbose: 
     print_run_prompts(prompt_template, persona, gpt_param, 
-                      prompt_input, prompt, output)
+                      prompt_input, prompt, full_output)
     
-  return output, [output, prompt, gpt_param, prompt_input, fail_safe]
+  return full_output, [full_output, prompt, gpt_param, prompt_input, fail_safe]
 
 
 def run_gpt_prompt_generate_hourly_schedule(persona, 

@@ -5,10 +5,16 @@
   "sec_per_step": 10,
   "maze_name": "the_ville",
   "persona_names": [
-    "Isabella Rodriguez", 
+    "Isabella Rodriguez",
     "Maria Lopez",
     "Klaus Mueller",
-    "Public Health Expert"   
+    "Public Health Expert",
+    "Abigail Chen",
+    "Adam Smith",
+    "Arthur Burton",
+    "Ayesha Khan",
+    "Carlos Gomez",
+    "Carmen Ortiz"
   ],
   "step": 0
 }
