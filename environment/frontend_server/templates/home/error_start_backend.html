@@ -2,5 +2,11 @@
 {% load staticfiles %}
 
 {% block content %}
-Please start the backend first.
+<div style="display: flex; justify-content: center; align-items: center; height: 80vh; flex-direction: column;">
+  <div style="text-align: center; padding: 40px; background-color: #f8f9fa; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 500px;">
+    <h2 style="color: #dc3545; margin-bottom: 20px;">⚠️ 后端未启动</h2>
+    <p style="font-size: 18px; color: #333; margin-bottom: 10px;">Please start the backend first.</p>
+    <p style="font-size: 14px; color: #666; margin-top: 20px;">请先启动后端服务，然后刷新此页面。</p>
+  </div>
+</div>
 {% endblock content %}
