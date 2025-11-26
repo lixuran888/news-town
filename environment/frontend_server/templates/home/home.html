@@ -44,7 +44,14 @@
 			  	<div class="row">
 			    	<h2 class="col-md-8" id="name__{{ p_name_os }}" style="margin-bottom:0.8em; font-size:1.85em; ">
 			    		{{p_name}} &nbsp;&nbsp;
-			    		<a href="{% url 'replay_persona_state' sim_code step p_name_os %}" style="font-size:0.6em">State Details</a>
+			    		<button type="button" class="btn btn-sm btn-info state-details-btn" 
+			    		        data-persona-name="{{ p_name }}" 
+			    		        data-persona-name-os="{{ p_name_os }}" 
+			    		        data-sim-code="{{ sim_code }}" 
+			    		        data-step="{{ step }}"
+			    		        style="font-size:0.6em; padding: 2px 8px;">
+			    			State Details
+			    		</button>
 			    	</h2>
 			    </div>
 			    <div style="">
@@ -72,8 +79,226 @@
 <div style="padding-bottom:15em"> </div>
 
 
+<!-- Persona State Details Modal -->
+<div class="modal fade" id="personaStateModal" tabindex="-1" role="dialog" aria-labelledby="personaStateModalLabel">
+  <div class="modal-dialog modal-lg" role="document" style="width:90%; max-width:1200px;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+        <h3 class="modal-title" id="personaStateModalLabel">Agent State Details</h3>
+      </div>
+      <div class="modal-body" id="personaStateModalBody" style="max-height:70vh; overflow-y:auto; padding:2em;">
+        <div class="text-center">
+          <span class="glyphicon glyphicon-refresh glyphicon-spin"></span> 加载中...
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">关闭</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- partial -->
 <script src='https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js'></script>
 {% include 'home/main_script.html' %}
+
+<style>
+.glyphicon-spin {
+  -webkit-animation: spin 1000ms infinite linear;
+  animation: spin 1000ms infinite linear;
+}
+@-webkit-keyframes spin {
+  0% {
+    -webkit-transform: rotate(0deg);
+    transform: rotate(0deg);
+  }
+  100% {
+    -webkit-transform: rotate(359deg);
+    transform: rotate(359deg);
+  }
+}
+@keyframes spin {
+  0% {
+    -webkit-transform: rotate(0deg);
+    transform: rotate(0deg);
+  }
+  100% {
+    -webkit-transform: rotate(359deg);
+    transform: rotate(359deg);
+  }
+}
+</style>
+
 {% endblock content %}
+
+{% block js_content %}
+<script type="text/javascript">
+// 使用事件委托，确保按钮点击事件能正常工作
+$(document).on('click', '.state-details-btn', function(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  
+  var personaName = $(this).data('persona-name');
+  var personaNameOs = $(this).data('persona-name-os');
+  var simCode = $(this).data('sim-code');
+  var step = $(this).data('step');
+  
+  console.log('State Details button clicked:', personaName, simCode, step);
+  
+  // 显示modal
+  $('#personaStateModal').modal('show');
+  
+  // 设置标题
+  $('#personaStateModalLabel').text(personaName + ' - State Details');
+  
+  // 重置内容为加载状态
+  $('#personaStateModalBody').html(
+    '<div class="text-center"><span class="glyphicon glyphicon-refresh glyphicon-spin"></span> 加载中...</div>'
+  );
+  
+  // 加载数据 - 构建URL
+  var url = '/replay_persona_state/' + simCode + '/' + step + '/' + personaNameOs + '/?format=json';
+  console.log('Loading URL:', url);
+  
+  $.ajax({
+    url: url,
+    type: 'GET',
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    success: function(data) {
+      console.log('Data loaded successfully');
+      renderPersonaState(data);
+    },
+    error: function(xhr, status, error) {
+      console.error('Error loading data:', error, xhr);
+      $('#personaStateModalBody').html(
+        '<div class="alert alert-danger">加载失败: ' + error + ' (状态码: ' + xhr.status + ')</div>'
+      );
+    }
+  });
+});
+
+function renderPersonaState(data) {
+  var html = '';
+  var scratch = data.scratch;
+  var a_mem_event = data.a_mem_event;
+  var a_mem_chat = data.a_mem_chat;
+  var a_mem_thought = data.a_mem_thought;
+  
+  // Basic information
+  html += '<h3 style="font-size:1.65em"><strong>Basic information</strong></h3>';
+  html += '<table class="table table-bordered" style="font-size:1.3em">';
+  html += '<tr><td style="width:20%; font-weight:800">First name</td><td>' + (scratch.first_name || '') + '</td></tr>';
+  html += '<tr><td style="font-weight:800">Last name</td><td>' + (scratch.last_name || '') + '</td></tr>';
+  html += '<tr><td style="font-weight:800">Age</td><td>' + (scratch.age || '') + '</td></tr>';
+  html += '<tr><td style="font-weight:800">Current time</td><td>' + (scratch.curr_time || '') + '</td></tr>';
+  html += '<tr><td style="font-weight:800">Current tile</td><td>' + (scratch.curr_tile || '') + '</td></tr>';
+  html += '</table><br>';
+  
+  // Settings
+  html += '<hr style="border:solid; border-width:1px">';
+  html += '<h3 style="font-size:1.65em"><strong>Settings</strong></h3>';
+  html += '<table class="table table-bordered" style="font-size:1.3em">';
+  html += '<tr><td style="width:20%; font-weight:800">Vision Radius</td><td>' + (scratch.vision_r || '') + '</td></tr>';
+  html += '<tr><td style="font-weight:800">Attention Bandwidth</td><td>' + (scratch.att_bandwidth || '') + '</td></tr>';
+  html += '<tr><td style="font-weight:800">Retention</td><td>' + (scratch.retention || '') + '</td></tr>';
+  html += '</table><br>';
+  
+  // Personality and Lifestyle
+  html += '<hr style="border:solid; border-width:1px">';
+  html += '<h3 style="font-size:1.65em"><strong>Personality and Lifestyle</strong></h3>';
+  html += '<table class="table table-bordered" style="font-size:1.3em">';
+  html += '<tr><td style="font-weight:800">Innate tendency</td><td>' + (scratch.innate || '') + '</td></tr>';
+  html += '<tr><td style="font-weight:800">Learned tendency</td><td>' + (scratch.learned || '') + '</td></tr>';
+  html += '<tr><td style="font-weight:800">Currently</td><td>' + (scratch.currently || '') + '</td></tr>';
+  html += '<tr><td style="font-weight:800">Lifestyle</td><td>' + (scratch.lifestyle || '') + '</td></tr>';
+  html += '</table><br>';
+  
+  // Current Action State
+  html += '<hr style="border:solid; border-width:1px">';
+  html += '<h3 style="font-size:1.65em"><strong>Current Action State</strong></h3>';
+  html += '<table class="table table-bordered" style="font-size:1.3em">';
+  html += '<tr><td style="width:20%; font-weight:800">Daily Requirement</td><td>';
+  if (scratch.daily_req && scratch.daily_req.length > 0) {
+    html += '<ol>';
+    for (var i = 0; i < scratch.daily_req.length; i++) {
+      html += '<li>' + scratch.daily_req[i] + '</li>';
+    }
+    html += '</ol>';
+  }
+  html += '</td></tr>';
+  html += '<tr><td style="font-weight:800">Daily Schedule</td><td>';
+  if (scratch.f_daily_schedule && scratch.f_daily_schedule.length > 0) {
+    html += '<ol>';
+    for (var i = 0; i < scratch.f_daily_schedule.length; i++) {
+      html += '<li>' + scratch.f_daily_schedule[i] + '</li>';
+    }
+    html += '</ol>';
+  }
+  html += '</td></tr>';
+  html += '<tr><td style="font-weight:800">Action Address</td><td>' + (scratch.act_address || '') + '</td></tr>';
+  html += '<tr><td style="font-weight:800">Action Start Time</td><td>' + (scratch.act_start_time || '') + '</td></tr>';
+  html += '<tr><td style="font-weight:800">Action Duration</td><td>' + (scratch.act_duration || '') + '</td></tr>';
+  html += '<tr><td style="font-weight:800">Action Description</td><td>' + (scratch.act_description || '') + '</td></tr>';
+  html += '<tr><td style="font-weight:800">Action Pronunciatio</td><td>' + (scratch.act_pronunciatio || '') + '</td></tr>';
+  html += '</table><br>';
+  
+  // Agent's Memory - Event
+  html += '<hr style="border:solid; border-width:1px">';
+  html += '<h3 style="font-size:1.65em"><strong>Agent\'s Memory</strong></h3>';
+  html += '<h4 style="font-size:1.45em"><strong>Event</strong></h4>';
+  html += '<div style="width:100%">';
+  if (a_mem_event && a_mem_event.length > 0) {
+    for (var i = 0; i < a_mem_event.length; i++) {
+      var node = a_mem_event[i];
+      html += '<p>[node_' + (node.node_count || '') + '] ' + (node.created || '') + ': <strong>' + (node.description || '') + '</strong></p>';
+    }
+  } else {
+    html += '<p><em>No events</em></p>';
+  }
+  html += '</div><br>';
+  
+  // Agent's Conversation History
+  html += '<h4 style="font-size:1.45em"><strong>Agent\'s Conversation History</strong></h4>';
+  html += '<div style="width:100%">';
+  if (a_mem_chat && a_mem_chat.length > 0) {
+    for (var i = 0; i < a_mem_chat.length; i++) {
+      var node = a_mem_chat[i];
+      html += '<p>Created: ' + (node.created || '') + '<br>';
+      html += 'Description: ' + (node.description || '') + '<br>';
+      html += 'Filling: <br>';
+      if (node.filling && node.filling.length > 0) {
+        for (var j = 0; j < node.filling.length; j++) {
+          html += '<span style="font-style: italic;">' + node.filling[j][0] + '</span>: ' + node.filling[j][1] + '<br>';
+        }
+      }
+      html += '</p>';
+    }
+  } else {
+    html += '<p><em>No conversations</em></p>';
+  }
+  html += '</div><br>';
+  
+  // Agent's Thought
+  html += '<h4 style="font-size:1.45em"><strong>Agent\'s Thought</strong></h4>';
+  html += '<div style="width:100%">';
+  if (a_mem_thought && a_mem_thought.length > 0) {
+    for (var i = 0; i < a_mem_thought.length; i++) {
+      var node = a_mem_thought[i];
+      html += '<p>[node_' + (node.node_count || '') + '] ' + (node.created || '') + ': <strong>' + (node.description || '') + '</strong>';
+      html += '<br>(Depth: ' + (node.depth || '') + '; Evidence: ' + (node.filling || '') + ')</p>';
+    }
+  } else {
+    html += '<p><em>No thoughts</em></p>';
+  }
+  html += '</div><br>';
+  
+  $('#personaStateModalBody').html(html);
+}
+</script>
+{% endblock js_content %}
 

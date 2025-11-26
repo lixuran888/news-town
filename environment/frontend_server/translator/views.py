@@ -223,6 +223,20 @@ def replay_persona_state(request, sim_code, step, persona_name):
     elif node_details["type"] == "thought":
       a_mem_thought += [node_details]
   
+  # 如果请求是AJAX，返回JSON格式
+  if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.GET.get('format') == 'json':
+    return JsonResponse({
+      "sim_code": sim_code,
+      "step": step,
+      "persona_name": persona_name, 
+      "persona_name_underscore": persona_name_underscore, 
+      "scratch": scratch,
+      "spatial": spatial,
+      "a_mem_event": a_mem_event,
+      "a_mem_chat": a_mem_chat,
+      "a_mem_thought": a_mem_thought
+    })
+  
   context = {"sim_code": sim_code,
              "step": step,
              "persona_name": persona_name, 
