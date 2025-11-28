@@ -146,6 +146,11 @@ class Scratch:
     # e.g., ["Dolores Murphy"] = self.vision_r
     self.chatting_with_buffer = dict()
     self.chatting_end_time = None
+    
+    # 对话前的原计划信息，用于对话结束后恢复
+    self.pre_chat_act_address = None
+    self.pre_chat_act_description = None
+    self.pre_chat_act_end_time = None
 
     # <path_set> is True if we've already calculated the path the persona will
     # take to execute this action. That path is stored in the persona's 
@@ -232,6 +237,16 @@ class Scratch:
       else:
         self.chatting_end_time = None
 
+      # 加载对话前原计划信息
+      self.pre_chat_act_address = scratch_load.get("pre_chat_act_address")
+      self.pre_chat_act_description = scratch_load.get("pre_chat_act_description")
+      if scratch_load.get("pre_chat_act_end_time"):
+        self.pre_chat_act_end_time = datetime.datetime.strptime(
+                                            scratch_load["pre_chat_act_end_time"],
+                                            "%B %d, %Y, %H:%M:%S")
+      else:
+        self.pre_chat_act_end_time = None
+
       self.act_path_set = scratch_load["act_path_set"]
       self.planned_path = scratch_load["planned_path"]
 
@@ -304,6 +319,15 @@ class Scratch:
                                         .strftime("%B %d, %Y, %H:%M:%S"))
     else: 
       scratch["chatting_end_time"] = None
+
+    # 保存对话前原计划信息
+    scratch["pre_chat_act_address"] = self.pre_chat_act_address
+    scratch["pre_chat_act_description"] = self.pre_chat_act_description
+    if self.pre_chat_act_end_time:
+      scratch["pre_chat_act_end_time"] = (self.pre_chat_act_end_time
+                                           .strftime("%B %d, %Y, %H:%M:%S"))
+    else:
+      scratch["pre_chat_act_end_time"] = None
 
     scratch["act_path_set"] = self.act_path_set
     scratch["planned_path"] = self.planned_path

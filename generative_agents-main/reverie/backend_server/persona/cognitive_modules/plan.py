@@ -1029,6 +1029,7 @@ def _should_react(persona, retrieved, personas):
     - 距离 <= 5 格: 直接对话
     - 5 < 距离 <= 20 格: 0.8 概率走过去 (approach)
     - 防止互相追逐：如果对方已在 approaching 我，我等待
+    - 重要任务中不打断（除非距离 <= 5 近距离接触）
     """
     # 基础检查
     if (not target_persona.scratch.act_address 
@@ -1049,6 +1050,19 @@ def _should_react(persona, retrieved, personas):
     # 等待中不对话
     if "<waiting>" in target_persona.scratch.act_address: 
       return False
+    
+    # 检查是否在执行重要任务（简单关键词检查）
+    # 如果是重要任务，只有非常近（<=5格）才打断
+    important_keywords = ["meeting", "emergency", "urgent", "interview", "exam", 
+                          "会议", "紧急", "面试", "考试", "presentation"]
+    def is_important_task(desc):
+      if not desc:
+        return False
+      desc_lower = desc.lower()
+      return any(kw in desc_lower for kw in important_keywords)
+    
+    init_important = is_important_task(init_persona.scratch.act_description)
+    target_important = is_important_task(target_persona.scratch.act_description)
 
     # 已经在对话中不重复对话
     if (target_persona.scratch.chatting_with 
@@ -1081,12 +1095,17 @@ def _should_react(persona, retrieved, personas):
     if dist > 20:
       return False
     
-    # 距离 <= 5 格: 直接对话！
+    # 距离 <= 5 格: 直接对话！（即使在做重要任务，近距离也可以对话）
     if dist <= 5:
       print(f"[Talk] {init_persona.scratch.name} 与 {target_persona.scratch.name} 距离 {dist:.1f} 格，开始对话")
       return True
     
     # 5 < 距离 <= 20 格: 0.8 概率走过去
+    # 但如果任一方在做重要任务，不主动靠近打扰
+    if init_important or target_important:
+      print(f"[Skip Approach] 重要任务中，不打扰: {init_persona.scratch.act_description[:30]}")
+      return False
+    
     approach_probability = 0.8
     if random.random() < approach_probability:
       print(f"[Approach] {init_persona.scratch.name} 决定走向 {target_persona.scratch.name} (距离 {dist:.1f} 格)")
@@ -1122,11 +1141,15 @@ def _should_react(persona, retrieved, personas):
     init_area = get_area(init_persona.scratch.act_address)
     target_area = get_area(target_persona.scratch.act_address)
     
-    # 如果路径为空但在同一区域，仍可触发对话
+    # 如果路径为空但在同一区域，仍可触发对话（需要距离检查）
     if init_persona.scratch.planned_path == []:
       if init_area != target_area:
         return False
-      # 在同一区域，允许对话
+      # 在同一区域，但还需要检查物理距离
+      dist = get_distance(init_persona, target_persona)
+      if dist > 5:  # 距离太远，不触发对话
+        return False
+      # 在同一区域且距离近，允许对话
 
     if init_area != target_area: 
       return False
@@ -1236,6 +1259,17 @@ def _chat_react(maze, persona, focused_event, reaction_mode, personas):
   target_persona = personas[reaction_mode[9:].strip()]
   curr_personas = [init_persona, target_persona]
 
+  # 保存对话前的原计划信息（用于对话结束后判断是否恢复）
+  for p in curr_personas:
+    if p.scratch.act_address and not p.scratch.chatting_with:
+      # 计算原计划的结束时间
+      if p.scratch.act_start_time and p.scratch.act_duration:
+        original_end = p.scratch.act_start_time + datetime.timedelta(minutes=p.scratch.act_duration)
+        p.scratch.pre_chat_act_address = p.scratch.act_address
+        p.scratch.pre_chat_act_description = p.scratch.act_description
+        p.scratch.pre_chat_act_end_time = original_end
+        print(f"[PreChat] {p.scratch.name} 保存原计划: {p.scratch.act_description[:30]}... 结束于 {original_end.strftime('%H:%M')}")
+
   # Actually creating the conversation here. 
   convo_result = generate_convo(maze, init_persona, target_persona)
   
@@ -1342,7 +1376,38 @@ def plan(persona, maze, personas, new_day, retrieved):
 
   # PART 2: If the current action has expired, we want to create a new plan.
   if persona.scratch.act_check_finished(): 
-    _determine_action(persona, maze)
+    # 检查是否是对话结束后需要恢复原计划
+    if (persona.scratch.pre_chat_act_address and 
+        persona.scratch.pre_chat_act_end_time and
+        persona.scratch.curr_time < persona.scratch.pre_chat_act_end_time):
+      # 对话结束，但原计划时间还没到，恢复原计划
+      remaining_minutes = int((persona.scratch.pre_chat_act_end_time - persona.scratch.curr_time).total_seconds() / 60)
+      if remaining_minutes > 0:
+        print(f"[PostChat] {persona.scratch.name} 对话结束，恢复原计划: {persona.scratch.pre_chat_act_description[:30]}... 剩余 {remaining_minutes} 分钟")
+        persona.scratch.act_address = persona.scratch.pre_chat_act_address
+        persona.scratch.act_description = persona.scratch.pre_chat_act_description
+        persona.scratch.act_duration = remaining_minutes
+        persona.scratch.act_start_time = persona.scratch.curr_time
+        persona.scratch.act_path_set = False
+        # 清除对话后保存的信息
+        persona.scratch.pre_chat_act_address = None
+        persona.scratch.pre_chat_act_description = None
+        persona.scratch.pre_chat_act_end_time = None
+      else:
+        # 时间不足，进入下一步
+        print(f"[PostChat] {persona.scratch.name} 对话结束，原计划时间已过，进入下一步")
+        persona.scratch.pre_chat_act_address = None
+        persona.scratch.pre_chat_act_description = None
+        persona.scratch.pre_chat_act_end_time = None
+        _determine_action(persona, maze)
+    else:
+      # 没有保存的原计划，或者原计划时间已过，正常进入下一步
+      if persona.scratch.pre_chat_act_address:
+        print(f"[PostChat] {persona.scratch.name} 对话结束，原计划时间已过，跳到下一步")
+        persona.scratch.pre_chat_act_address = None
+        persona.scratch.pre_chat_act_description = None
+        persona.scratch.pre_chat_act_end_time = None
+      _determine_action(persona, maze)
 
   # PART 3: If you perceived an event that needs to be responded to (saw 
   # another persona), and retrieved relevant information. 
