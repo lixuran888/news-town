@@ -12,6 +12,15 @@ sys.path.append('../')
 
 from global_methods import *
 
+# 情感分析模块
+try:
+    from sentiment.sentiment_analysis import analyze_sentiment, get_sentiment_summary
+    SENTIMENT_ENABLED = True
+    print("[Converse] 情感分析模块已加载")
+except ImportError:
+    SENTIMENT_ENABLED = False
+    print("[Converse] 情感分析模块未加载，将跳过情感标签")
+
 from persona.memory_structures.spatial_memory import *
 from persona.memory_structures.associative_memory import *
 from persona.memory_structures.scratch import *
@@ -124,7 +133,8 @@ def generate_one_utterance(maze, init_persona, target_persona, retrieved, curr_c
   return x["utterance"], x["end"]
 
 def agent_chat_v2(maze, init_persona, target_persona): 
-  curr_chat = []
+  curr_chat = []  # [[speaker, utterance], ...]
+  curr_chat_with_sentiment = []  # [[speaker, utterance, sentiment_info], ...]
   print ("July 23")
 
   for i in range(8): 
@@ -144,6 +154,15 @@ def agent_chat_v2(maze, init_persona, target_persona):
                       f"{target_persona.scratch.name} is {target_persona.scratch.act_description}"]
     retrieved = new_retrieve(init_persona, focal_points, 15)
     utt, end = generate_one_utterance(maze, init_persona, target_persona, retrieved, curr_chat)
+
+    # 情感分析
+    if SENTIMENT_ENABLED:
+      sentiment = analyze_sentiment(utt)
+      emoji = "😊" if sentiment["label"] == "positive" else ("😟" if sentiment["label"] == "negative" else "😐")
+      print(f"[Sentiment] {init_persona.scratch.name}: {utt[:50]}... [{emoji} {sentiment['label']} {sentiment['score']:+.2f}]")
+      curr_chat_with_sentiment.append([init_persona.scratch.name, utt, sentiment])
+    else:
+      curr_chat_with_sentiment.append([init_persona.scratch.name, utt, None])
 
     curr_chat += [[init_persona.scratch.name, utt]]
     if end:
@@ -167,16 +186,58 @@ def agent_chat_v2(maze, init_persona, target_persona):
     retrieved = new_retrieve(target_persona, focal_points, 15)
     utt, end = generate_one_utterance(maze, target_persona, init_persona, retrieved, curr_chat)
 
+    # 情感分析
+    if SENTIMENT_ENABLED:
+      sentiment = analyze_sentiment(utt)
+      emoji = "😊" if sentiment["label"] == "positive" else ("😟" if sentiment["label"] == "negative" else "😐")
+      print(f"[Sentiment] {target_persona.scratch.name}: {utt[:50]}... [{emoji} {sentiment['label']} {sentiment['score']:+.2f}]")
+      curr_chat_with_sentiment.append([target_persona.scratch.name, utt, sentiment])
+    else:
+      curr_chat_with_sentiment.append([target_persona.scratch.name, utt, None])
+
     curr_chat += [[target_persona.scratch.name, utt]]
     if end:
       break
 
+  # 输出对话和情感汇总
   print ("July 23 PU")
-  for row in curr_chat: 
-    print (row)
+  print ("=" * 60)
+  print ("[对话记录 with 情感标签]")
+  for row in curr_chat_with_sentiment: 
+    if row[2]:  # 有情感信息
+      emoji = "😊" if row[2]["label"] == "positive" else ("😟" if row[2]["label"] == "negative" else "😐")
+      print(f"  {row[0]}: {row[1]} [{emoji} {row[2]['label']} {row[2]['score']:+.2f}]")
+    else:
+      print(f"  {row[0]}: {row[1]}")
+  
+  # 情感汇总
+  if SENTIMENT_ENABLED:
+    summary = get_sentiment_summary(curr_chat)
+    print ("=" * 60)
+    print ("[情感汇总]")
+    print (f"  总对话数: {summary['total_utterances']}")
+    print (f"  正面: {summary['positive_count']} | 负面: {summary['negative_count']} | 中性: {summary['neutral_count']}")
+    print (f"  平均情感分: {summary['average_score']:+.3f}")
+    print (f"  情感趋势: {summary['sentiment_trend']}")
+  print ("=" * 60)
   print ("July 23 FIN")
 
-  return curr_chat
+  # 返回对话，直接在文本中加入情感标签
+  # 格式: [[speaker, "utterance [😊positive]"], ...]
+  chat_with_emoji = []
+  for row in curr_chat_with_sentiment:
+    speaker = row[0]
+    utterance = row[1]
+    sentiment = row[2]
+    if sentiment:
+      emoji = "😊" if sentiment["label"] == "positive" else ("😟" if sentiment["label"] == "negative" else "😐")
+      # 在文本末尾加上情感标签
+      utterance_with_tag = f"{utterance} [{emoji}{sentiment['label']}]"
+    else:
+      utterance_with_tag = utterance
+    chat_with_emoji.append([speaker, utterance_with_tag])
+  
+  return chat_with_emoji
 
 
 

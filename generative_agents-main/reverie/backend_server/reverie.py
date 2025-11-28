@@ -39,6 +39,7 @@ from expert_init import (
   inject_food_poisoning_event,
   generate_and_broadcast_public_opinion,
 )
+from opinion_collector import collect_and_inject_opinions
 
 ##############################################################################
 #                                  REVERIE                                   #
@@ -516,6 +517,18 @@ class ReverieServer:
           # current time moves by <sec_per_step> amount. 
           self.step += 1
           self.curr_time += datetime.timedelta(seconds=self.sec_per_step)
+
+          # 在 10:55 触发一次：会议前收集民意并写入专家记忆
+          try:
+            if self.curr_time.hour == 10 and self.curr_time.minute >= 55:
+              curr_date = self.curr_time.date()
+              if not hasattr(self, 'last_opinion_collection_date') or self.last_opinion_collection_date != curr_date:
+                print(f"\n[Reverie] 触发会议前民意收集 @ {self.curr_time}")
+                collect_and_inject_opinions(self.personas, self.curr_time)
+                self.last_opinion_collection_date = curr_date
+          except Exception as e:
+            print(f"[Reverie] 民意收集异常: {e}")
+            pass
 
           # 在每天 23:00 触发一次：从平民聊天中汇总舆论，并写入专家长期记忆。
           try:

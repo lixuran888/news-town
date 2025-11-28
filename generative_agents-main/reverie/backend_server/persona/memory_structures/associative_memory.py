@@ -65,6 +65,9 @@ class AssociativeMemory:
     self.embeddings = json.load(open(f_saved + "/embeddings.json"))
 
     nodes_load = json.load(open(f_saved + "/nodes.json"))
+    # 处理 nodes.json 为空列表的情况（新创建的 persona）
+    if not isinstance(nodes_load, dict) or not nodes_load:
+      nodes_load = {}
     for count in range(len(nodes_load.keys())): 
       node_id = f"node_{str(count+1)}"
       node_details = nodes_load[node_id]

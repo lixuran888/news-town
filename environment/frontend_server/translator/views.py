@@ -21,6 +21,14 @@ from global_methods import *
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from .models import *
 
+# 情感分析模块
+try:
+    sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '..', 'generative_agents-main', 'reverie', 'backend_server'))
+    from sentiment.sentiment_analysis import analyze_sentiment, get_sentiment_summary
+    SENTIMENT_ENABLED = True
+except ImportError:
+    SENTIMENT_ENABLED = False
+
 def landing(request): 
   context = {}
   template = "landing/landing.html"
@@ -193,35 +201,102 @@ def replay_persona_state(request, sim_code, step, persona_name):
 
   persona_name_underscore = persona_name
   persona_name = " ".join(persona_name.split("_"))
-  memory = f"storage/{sim_code}/personas/{persona_name}/bootstrap_memory"
-  if not os.path.exists(memory): 
-    memory = f"compressed_storage/{sim_code}/personas/{persona_name}/bootstrap_memory"
+  
+  # Try multiple possible locations for persona data
+  memory = None
+  possible_paths = [
+    f"storage/{sim_code}/personas/{persona_name}/bootstrap_memory",
+    f"storage/{sim_code}/personas/{persona_name}",
+    f"compressed_storage/{sim_code}/personas/{persona_name}/bootstrap_memory",
+    # Fallback to base template if running sim has empty directories
+    f"storage/base_the_ville_clean/personas/{persona_name}/bootstrap_memory",
+  ]
+  
+  for path in possible_paths:
+    scratch_path = path + "/scratch.json"
+    if os.path.exists(scratch_path):
+      memory = path
+      break
+  
+  if not memory:
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.GET.get('format') == 'json':
+      return JsonResponse({"error": f"Persona data not found: {persona_name}"}, status=404)
+    return HttpResponse(f"Persona data not found: {persona_name}", status=404)
 
-  with open(memory + "/scratch.json") as json_file:  
-    scratch = json.load(json_file)
+  try:
+    with open(memory + "/scratch.json", encoding="utf-8") as json_file:  
+      scratch = json.load(json_file)
+  except Exception as e:
+    return HttpResponse(f"Error loading scratch.json from {memory}: {e}", status=500)
 
-  with open(memory + "/spatial_memory.json") as json_file:  
-    spatial = json.load(json_file)
+  try:
+    with open(memory + "/spatial_memory.json", encoding="utf-8") as json_file:  
+      spatial = json.load(json_file)
+  except Exception as e:
+    return HttpResponse(f"Error loading spatial_memory.json from {memory}: {e}", status=500)
 
-  with open(memory + "/associative_memory/nodes.json") as json_file:  
-    associative = json.load(json_file)
+  try:
+    with open(memory + "/associative_memory/nodes.json", encoding="utf-8") as json_file:  
+      associative = json.load(json_file)
+  except Exception as e:
+    return HttpResponse(f"Error loading associative_memory/nodes.json from {memory}: {e}", status=500)
 
   a_mem_event = []
   a_mem_chat = []
   a_mem_thought = []
 
-  for count in range(len(associative.keys()), 0, -1): 
-    node_id = f"node_{str(count)}"
-    node_details = associative[node_id]
+  # 处理 associative 可能是空列表或字典的情况
+  if isinstance(associative, dict) and associative:
+    for count in range(len(associative.keys()), 0, -1): 
+      node_id = f"node_{str(count)}"
+      node_details = associative.get(node_id)
+      if not node_details:
+        continue
 
-    if node_details["type"] == "event":
-      a_mem_event += [node_details]
+      if node_details.get("type") == "event":
+        a_mem_event += [node_details]
 
-    elif node_details["type"] == "chat":
-      a_mem_chat += [node_details]
+      elif node_details.get("type") == "chat":
+        a_mem_chat += [node_details]
 
-    elif node_details["type"] == "thought":
-      a_mem_thought += [node_details]
+      elif node_details.get("type") == "thought":
+        a_mem_thought += [node_details]
+  
+  # 情感统计
+  sentiment_stats = {
+    "enabled": SENTIMENT_ENABLED,
+    "total_chats": 0,
+    "positive_count": 0,
+    "negative_count": 0,
+    "neutral_count": 0,
+    "average_score": 0.0,
+    "chat_sentiments": []  # 每条对话的情感
+  }
+  
+  if SENTIMENT_ENABLED and a_mem_chat:
+    total_score = 0
+    for chat in a_mem_chat:
+      desc = chat.get("description", "")
+      if desc:
+        sentiment = analyze_sentiment(desc)
+        emoji = "😊" if sentiment["label"] == "positive" else ("😟" if sentiment["label"] == "negative" else "😐")
+        sentiment_stats["chat_sentiments"].append({
+          "description": desc[:100],
+          "label": sentiment["label"],
+          "score": sentiment["score"],
+          "emoji": emoji
+        })
+        total_score += sentiment["score"]
+        if sentiment["label"] == "positive":
+          sentiment_stats["positive_count"] += 1
+        elif sentiment["label"] == "negative":
+          sentiment_stats["negative_count"] += 1
+        else:
+          sentiment_stats["neutral_count"] += 1
+    
+    sentiment_stats["total_chats"] = len(a_mem_chat)
+    if sentiment_stats["total_chats"] > 0:
+      sentiment_stats["average_score"] = round(total_score / sentiment_stats["total_chats"], 3)
   
   # 如果请求是AJAX，返回JSON格式
   if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.GET.get('format') == 'json':
@@ -234,7 +309,8 @@ def replay_persona_state(request, sim_code, step, persona_name):
       "spatial": spatial,
       "a_mem_event": a_mem_event,
       "a_mem_chat": a_mem_chat,
-      "a_mem_thought": a_mem_thought
+      "a_mem_thought": a_mem_thought,
+      "sentiment_stats": sentiment_stats
     })
   
   context = {"sim_code": sim_code,
@@ -245,7 +321,8 @@ def replay_persona_state(request, sim_code, step, persona_name):
              "spatial": spatial,
              "a_mem_event": a_mem_event,
              "a_mem_chat": a_mem_chat,
-             "a_mem_thought": a_mem_thought}
+             "a_mem_thought": a_mem_thought,
+             "sentiment_stats": sentiment_stats}
   template = "persona_state/persona_state.html"
   return render(request, template, context)
 

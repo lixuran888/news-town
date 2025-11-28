@@ -170,6 +170,10 @@ def perceive(persona, maze):
                       chat_poignancy, chat_embedding_pair, 
                       persona.scratch.chat)
         chat_node_ids = [chat_node.node_id]
+        # 对话也触发反思（根据对话重要性减少计数器）
+        # 对话通常比普通事件更重要，权重加倍
+        persona.scratch.importance_trigger_curr -= chat_poignancy * 2
+        persona.scratch.importance_ele_n += 1
 
       # Finally, we add the current event to the agent's memory. 
       ret_events += [persona.a_mem.add_event(persona.scratch.curr_time, None,

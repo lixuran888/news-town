@@ -11,10 +11,20 @@ from pathlib import Path
 
 def find_latest_sim(storage_dir: Path) -> str:
     candidates = [p for p in storage_dir.iterdir() if p.is_dir()]
-    # 只选择包含 reverie/meta.json 且存在 environment 目录的有效仿真
+    # 只选择包含完整数据的有效仿真
     valid = []
     for p in candidates:
-        if (p / "reverie" / "meta.json").exists() and (p / "environment").exists():
+        meta_exists = (p / "reverie" / "meta.json").exists()
+        env_exists = (p / "environment").exists()
+        personas_dir = p / "personas"
+        # personas 目录必须存在，且至少一个 persona 有 scratch.json
+        personas_valid = False
+        if personas_dir.exists():
+            for persona in personas_dir.iterdir():
+                if persona.is_dir() and (persona / "bootstrap_memory" / "scratch.json").exists():
+                    personas_valid = True
+                    break
+        if meta_exists and env_exists and personas_valid:
             valid.append(p)
     if not valid:
         return ""

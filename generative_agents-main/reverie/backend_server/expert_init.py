@@ -9,6 +9,14 @@ from domain_knowledge.food_safety_rules import (
   retrieve_food_safety_rules,
   format_rules_for_prompt,
 )
+from domain_knowledge.market_supervision_rules import (
+  retrieve_market_supervision_rules,
+  format_market_supervision_rules_for_prompt,
+)
+from domain_knowledge.education_rules import (
+  retrieve_education_rules,
+  format_education_rules_for_prompt,
+)
 
 
 FOOD_POISONING_EVENT_TEXT = (
@@ -323,3 +331,131 @@ def expert_meeting_speech(persona,
   )
 
   return ChatGPT_single_request(prompt)
+
+
+def market_supervision_expert_meeting_speech(persona,
+                                              question: str,
+                                              max_memories: int = 6,
+                                              max_rules: int = 3,
+                                              max_case_snippets: int = 3,
+                                              max_public_opinion: int = 1) -> str:
+  """Generate speech for Market Supervision Expert."""
+  if not question or not question.strip():
+    return "(empty question)"
+
+  try:
+    name = getattr(persona.scratch, "name", persona.name)
+  except Exception:
+    name = getattr(persona, "name", "Market Supervision Expert")
+
+  memory_nodes = _select_relevant_memory_nodes(persona, question, max_memories)
+  memory_block = _format_memory_nodes_for_prompt(memory_nodes)
+
+  case_snippets = retrieve_food_poisoning_knowledge(question, top_k=max_case_snippets)
+  case_block = "\n\n".join(case_snippets) if case_snippets else "(暂无相关案例)"
+
+  rules = retrieve_market_supervision_rules(question, top_k=max_rules)
+  rules_block = format_market_supervision_rules_for_prompt(rules)
+
+  opinion_block = _format_public_opinion_from_nodes(memory_nodes, max_public_opinion)
+
+  prompt = (
+    "你是一名市场监管领域的资深专家，正在参加校园食品安全专家咨询会议。"
+    "你的专业领域包括：市场主体监管、食品经营许可、价格监管、消费者权益保护等。\n"
+    "请基于下列信息进行分析和发言：\n\n"
+    "【一、长期记忆片段】\n"
+    f"{memory_block}\n\n"
+    "【二、历史案例】\n"
+    f"{case_block}\n\n"
+    "【三、市场监管规则库】\n"
+    f"{rules_block}\n\n"
+    "【四、公众舆论】\n"
+    f"{opinion_block}\n\n"
+    "【五、本轮问题】\n"
+    f"{question.strip()}\n\n"
+    f"请以 {name} 的身份发言，要求：\n"
+    "1. 从市场监管角度分析食堂经营资质、供应商审核、价格行为等问题。\n"
+    "2. 分析市场监管责任主体和监管漏洞。\n"
+    "3. 给出操作性建议，区分紧急措施和长期制度完善。\n"
+    "4. 可引用 MS 规则编号，保持专业客观。\n"
+  )
+  return ChatGPT_single_request(prompt)
+
+
+def education_expert_meeting_speech(persona,
+                                     question: str,
+                                     max_memories: int = 6,
+                                     max_rules: int = 3,
+                                     max_case_snippets: int = 3,
+                                     max_public_opinion: int = 1) -> str:
+  """Generate speech for Education Bureau Representative."""
+  if not question or not question.strip():
+    return "(empty question)"
+
+  try:
+    name = getattr(persona.scratch, "name", persona.name)
+  except Exception:
+    name = getattr(persona, "name", "Education Bureau Representative")
+
+  memory_nodes = _select_relevant_memory_nodes(persona, question, max_memories)
+  memory_block = _format_memory_nodes_for_prompt(memory_nodes)
+
+  case_snippets = retrieve_food_poisoning_knowledge(question, top_k=max_case_snippets)
+  case_block = "\n\n".join(case_snippets) if case_snippets else "(暂无相关案例)"
+
+  rules = retrieve_education_rules(question, top_k=max_rules)
+  rules_block = format_education_rules_for_prompt(rules)
+
+  opinion_block = _format_public_opinion_from_nodes(memory_nodes, max_public_opinion)
+
+  prompt = (
+    "你是一名教育局的资深代表，正在参加校园食品安全专家咨询会议。"
+    "你的专业领域包括：学校管理、校园安全、家校沟通、应急处置、教育政策执行等。\n"
+    "请基于下列信息进行分析和发言：\n\n"
+    "【一、长期记忆片段】\n"
+    f"{memory_block}\n\n"
+    "【二、历史案例】\n"
+    f"{case_block}\n\n"
+    "【三、教育管理规则库】\n"
+    f"{rules_block}\n\n"
+    "【四、公众舆论】\n"
+    f"{opinion_block}\n\n"
+    "【五、本轮问题】\n"
+    f"{question.strip()}\n\n"
+    f"请以 {name} 的身份发言，要求：\n"
+    "1. 从教育管理角度分析学校管理责任、应急预案执行、家校沟通机制等。\n"
+    "2. 分析事件对教学秩序、学生心理、家长信任的影响。\n"
+    "3. 给出操作性建议，区分紧急措施和长期制度完善。\n"
+    "4. 可引用 ED 规则编号，对受影响学生和家长表达关怀。\n"
+  )
+  return ChatGPT_single_request(prompt)
+
+
+def get_expert_role(persona) -> str:
+  """Get the expert role type from persona name."""
+  try:
+    role = getattr(persona.scratch, "role", None)
+    if role:
+      return role
+    name = persona.name.lower()
+    if "market" in name or "supervision" in name:
+      return "market_supervision_expert"
+    elif "education" in name:
+      return "education_expert"
+    elif "health" in name or "food" in name:
+      return "public_health_expert"
+    else:
+      return "generic_expert"
+  except Exception:
+    return "generic_expert"
+
+
+def get_expert_speech_function(persona):
+  """Return the appropriate speech function for an expert persona."""
+  role = get_expert_role(persona)
+  if role == "market_supervision_expert":
+    return market_supervision_expert_meeting_speech
+  elif role == "education_expert":
+    return education_expert_meeting_speech
+  else:
+    return expert_meeting_speech

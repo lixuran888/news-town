@@ -189,7 +189,7 @@ def reflect(persona):
   # print (persona.scratch.name, "al;sdhfjlsad", persona.scratch.chatting_end_time)
   if persona.scratch.chatting_end_time: 
     # print("DEBUG", persona.scratch.curr_time + datetime.timedelta(0,10))
-    if persona.scratch.curr_time + datetime.timedelta(0,10) == persona.scratch.chatting_end_time: 
+    if persona.scratch.curr_time + datetime.timedelta(0,10) >= persona.scratch.chatting_end_time: 
       # print ("KABOOOOOMMMMMMM")
       all_utt = ""
       if persona.scratch.chat: 

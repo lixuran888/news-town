@@ -1,5 +1,5 @@
 {
-  "fork_sim_code": "base_the_ville_isabella_maria_klaus",
+  "fork_sim_code": "base_the_ville_clean",
   "start_date": "February 13, 2023",
   "curr_time": "February 13, 2023, 00:00:00",
   "sec_per_step": 10,
@@ -8,13 +8,16 @@
     "Isabella Rodriguez",
     "Maria Lopez",
     "Klaus Mueller",
-    "Public Health Expert",
     "Abigail Chen",
     "Adam Smith",
     "Arthur Burton",
     "Ayesha Khan",
     "Carlos Gomez",
-    "Carmen Ortiz"
+    "Carmen Ortiz",
+    "Public Health Expert",
+    "Market Supervision Expert",
+    "Education Bureau Representative",
+    "Meeting Moderator"
   ],
   "step": 0
 }

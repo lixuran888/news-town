@@ -176,6 +176,37 @@
 			<br>
 
 			
+			<!-- 情感统计面板 -->
+			{% if sentiment_stats.enabled %}
+			<div style="background-color:#f0f8ff; padding:1em; border-radius:8px; margin-bottom:1em; border-left:4px solid #4CAF50;">
+				<h4 style="font-size:1.45em; margin-top:0;"><strong>📊 Sentiment Analysis</strong></h4>
+				<div style="display:flex; gap:2em; flex-wrap:wrap;">
+					<div style="text-align:center; padding:0.5em 1em; background:#e8f5e9; border-radius:5px;">
+						<div style="font-size:2em;">😊</div>
+						<div style="font-weight:bold; color:#2e7d32;">Positive</div>
+						<div style="font-size:1.5em;">{{ sentiment_stats.positive_count }}</div>
+					</div>
+					<div style="text-align:center; padding:0.5em 1em; background:#fff3e0; border-radius:5px;">
+						<div style="font-size:2em;">😐</div>
+						<div style="font-weight:bold; color:#f57c00;">Neutral</div>
+						<div style="font-size:1.5em;">{{ sentiment_stats.neutral_count }}</div>
+					</div>
+					<div style="text-align:center; padding:0.5em 1em; background:#ffebee; border-radius:5px;">
+						<div style="font-size:2em;">😟</div>
+						<div style="font-weight:bold; color:#c62828;">Negative</div>
+						<div style="font-size:1.5em;">{{ sentiment_stats.negative_count }}</div>
+					</div>
+					<div style="text-align:center; padding:0.5em 1em; background:#e3f2fd; border-radius:5px;">
+						<div style="font-size:1.2em;">Average Score</div>
+						<div style="font-size:1.8em; font-weight:bold; color:#1565c0;">{{ sentiment_stats.average_score }}</div>
+					</div>
+				</div>
+				<div style="margin-top:0.5em; font-size:0.9em; color:#666;">
+					Total conversations analyzed: {{ sentiment_stats.total_chats }}
+				</div>
+			</div>
+			{% endif %}
+
 			<h4 style="font-size:1.45em"><strong>Agent's Conversation History</strong></h4>
 			<div class="" style="width:100%">
 			  {% for node_details in a_mem_chat %}

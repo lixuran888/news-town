@@ -48,6 +48,21 @@
     "maze": "the_ville",
     "x": 123,
     "y": 57
+  },
+  "Market Supervision Expert": {
+    "maze": "the_ville",
+    "x": 93,
+    "y": 49
+  },
+  "Education Bureau Representative": {
+    "maze": "the_ville",
+    "x": 118,
+    "y": 61
+  },
+  "Meeting Moderator": {
+    "maze": "the_ville",
+    "x": 128,
+    "y": 46
   }
 }
 

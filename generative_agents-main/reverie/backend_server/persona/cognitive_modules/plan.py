@@ -383,9 +383,17 @@ def generate_convo(maze, init_persona, target_persona):
       target_persona.scratch.name == "Public Health Expert"):
     return []
 
-  convo = agent_chat_v2(maze, init_persona, target_persona)
+  result = agent_chat_v2(maze, init_persona, target_persona)
+  
+  # agent_chat_v2 现在返回 (curr_chat, curr_chat_with_sentiment)
+  if isinstance(result, tuple) and len(result) == 2:
+    convo, convo_with_sentiment = result
+  else:
+    # 兼容旧版本
+    convo = result
+    convo_with_sentiment = None
+  
   all_utt = ""
-
   for row in convo: 
     speaker = row[0]
     utt = row[1]
@@ -394,7 +402,9 @@ def generate_convo(maze, init_persona, target_persona):
   convo_length = math.ceil(int(len(all_utt)/8) / 30)
 
   if debug: print ("GNS FUNCTION: <generate_convo>")
-  return convo, convo_length
+  
+  # 返回时包含情感数据（如果有）
+  return convo, convo_length, convo_with_sentiment
 
 
 def generate_convo_summary(persona, convo): 
@@ -1009,11 +1019,33 @@ def _should_react(persona, retrieved, personas):
     personas: A dictionary that contains all persona names as keys, and the 
               <Persona> instance as values. 
   """
+  def get_distance(persona1, persona2):
+    """计算两个 persona 之间的距离"""
+    if not persona1.scratch.curr_tile or not persona2.scratch.curr_tile:
+      return float('inf')
+    x1, y1 = persona1.scratch.curr_tile
+    x2, y2 = persona2.scratch.curr_tile
+    return ((x1-x2)**2 + (y1-y2)**2) ** 0.5
+
   def lets_talk(init_persona, target_persona, retrieved):
+    # 注意：专家也可以参与日常对话，收集民意
+    # 不再阻止专家对话
+
     if (not target_persona.scratch.act_address 
         or not target_persona.scratch.act_description
         or not init_persona.scratch.act_address
         or not init_persona.scratch.act_description): 
+      return False
+    
+    # 计算距离
+    dist = get_distance(init_persona, target_persona)
+    
+    # 如果距离在视野范围内（20格）但超过5格，返回特殊值表示需要走过去
+    if 5 < dist <= 20:
+      return "approach"  # 需要走过去
+    
+    # 如果超出视野范围，不触发对话
+    if dist > 20:
       return False
 
     if ("sleeping" in target_persona.scratch.act_description 
@@ -1041,14 +1073,18 @@ def _should_react(persona, retrieved, personas):
     same_place = (init_persona.scratch.act_address 
                   == target_persona.scratch.act_address)
     hour = init_persona.scratch.curr_time.hour
-    social_hours = {8, 12, 13, 18, 19, 20}
-    if same_place and (hour in social_hours):
-      # Higher base probability during designated social hours.
-      if random.random() < 0.6:
+    
+    # 扩大社交时间范围：6am-11pm 都可以对话
+    if same_place and 6 <= hour <= 23:
+      # 同一地点时，90% 概率触发对话
+      if random.random() < 0.9:
         return True
+    
+    # 即使不在同一地点，也有小概率主动去找人聊天
+    if random.random() < 0.5:
+      return True
 
     if generate_decide_to_talk(init_persona, target_persona, retrieved): 
-
       return True
 
     return False
@@ -1105,8 +1141,14 @@ def _should_react(persona, retrieved, personas):
 
   if ":" not in curr_event.subject: 
     # this is a persona event. 
-    if lets_talk(persona, personas[curr_event.subject], retrieved):
+    talk_result = lets_talk(persona, personas[curr_event.subject], retrieved)
+    
+    if talk_result == "approach":
+      # 在视野范围内但距离超过5格，走过去
+      return f"approach {curr_event.subject}"
+    elif talk_result == True:
       return f"chat with {curr_event.subject}"
+    
     react_mode = lets_react(persona, personas[curr_event.subject], 
                             retrieved)
     return react_mode
@@ -1175,7 +1217,16 @@ def _chat_react(maze, persona, focused_event, reaction_mode, personas):
   curr_personas = [init_persona, target_persona]
 
   # Actually creating the conversation here. 
-  convo, duration_min = generate_convo(maze, init_persona, target_persona)
+  convo_result = generate_convo(maze, init_persona, target_persona)
+  
+  # 处理新的返回格式 (convo, duration_min, convo_with_sentiment)
+  if isinstance(convo_result, tuple) and len(convo_result) == 3:
+    convo, duration_min, convo_with_sentiment = convo_result
+  else:
+    # 兼容旧版本
+    convo, duration_min = convo_result[:2]
+    convo_with_sentiment = None
+  
   convo_summary = generate_convo_summary(init_persona, convo)
   inserted_act = convo_summary
   inserted_act_dur = duration_min
@@ -1195,13 +1246,13 @@ def _chat_react(maze, persona, focused_event, reaction_mode, personas):
       act_event = (p.name, "chat with", target_persona.name)
       chatting_with = target_persona.name
       chatting_with_buffer = {}
-      chatting_with_buffer[target_persona.name] = 800
+      chatting_with_buffer[target_persona.name] = 30  # 约5分钟冷却
     elif role == "target": 
       act_address = f"<persona> {init_persona.name}"
       act_event = (p.name, "chat with", init_persona.name)
       chatting_with = init_persona.name
       chatting_with_buffer = {}
-      chatting_with_buffer[init_persona.name] = 800
+      chatting_with_buffer[init_persona.name] = 30  # 约5分钟冷却
 
     act_pronunciatio = "💬" 
     act_obj_description = None
@@ -1293,6 +1344,16 @@ def plan(persona, maze, personas, new_day, retrieved):
       # If we do want to chat, then we generate conversation 
       if reaction_mode[:9] == "chat with":
         _chat_react(maze, persona, focused_event, reaction_mode, personas)
+      elif reaction_mode[:8] == "approach":
+        # 走向目标人物，更新路径
+        target_name = reaction_mode[9:].strip()
+        if target_name in personas:
+          target = personas[target_name]
+          if target.scratch.curr_tile:
+            # 设置目标位置为对方当前位置
+            persona.scratch.planned_path = maze.find_path(
+              persona.scratch.curr_tile, target.scratch.curr_tile)
+            print(f"[Approach] {persona.scratch.name} walking towards {target_name}")
       elif reaction_mode[:4] == "wait": 
         _wait_react(persona, reaction_mode)
       # elif reaction_mode == "do other things": 
