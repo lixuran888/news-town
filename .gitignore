@@ -39,3 +39,9 @@ environment/frontend_server/temp_storage/
 # If you ever export checkpoints or large debug dumps, ignore them
 checkpoints/
 dumps/
+
+# Test outputs
+all_chats.json
+verify_changes.py
+check_8am.py
+check_schedule_overlap.py
