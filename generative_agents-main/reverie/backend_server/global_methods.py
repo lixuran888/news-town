@@ -218,6 +218,9 @@ def copyanything(src, dst):
     None
   """
   try:
+    # 如果目标目录已存在，先删除再复制
+    if os.path.exists(dst):
+      shutil.rmtree(dst)
     shutil.copytree(src, dst)
   except OSError as exc: # python >2.5
     if exc.errno in (errno.ENOTDIR, errno.EINVAL):

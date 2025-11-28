@@ -84,6 +84,13 @@ def execute(persona, maze, personas, plan):
 
       if base_addr in maze.address_tiles:
         target_tiles = maze.address_tiles[base_addr]
+        
+        # 如果已经在目标区域内，就停留在当前位置，避免无限走动
+        curr_tile = tuple(persona.scratch.curr_tile)
+        if curr_tile in target_tiles:
+          target_tiles = [list(curr_tile)]  # 停在原地
+        else:
+          target_tiles = random.sample(list(target_tiles), 1)
       else:
         # 与默认分支相同的回退策略，避免 DeepSeek 生成的非法地址导致 KeyError。
         living_addr = None
@@ -94,10 +101,9 @@ def execute(persona, maze, personas, plan):
 
         if living_addr and living_addr in maze.address_tiles:
           target_tiles = maze.address_tiles[living_addr]
+          target_tiles = random.sample(list(target_tiles), 1)
         else:
-          target_tiles = [persona.scratch.curr_tile]
-
-      target_tiles = random.sample(list(target_tiles), 1)
+          target_tiles = [persona.scratch.curr_tile]  # 停在原地
 
     else: 
       # This is our default execution. We simply take the persona to the

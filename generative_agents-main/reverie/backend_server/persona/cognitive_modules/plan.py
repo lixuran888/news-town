@@ -378,11 +378,7 @@ def generate_convo(maze, init_persona, target_persona):
 
   # convo = run_gpt_prompt_create_conversation(init_persona, target_persona, curr_loc)[0]
   # convo = agent_chat_v1(maze, init_persona, target_persona)
-  # 对于 Public Health Expert，不触发任何 agent-to-agent 聊天逻辑
-  if (init_persona.scratch.name == "Public Health Expert" or
-      target_persona.scratch.name == "Public Health Expert"):
-    return []
-
+  
   result = agent_chat_v2(maze, init_persona, target_persona)
   
   # agent_chat_v2 现在返回 (curr_chat, curr_chat_with_sentiment)
@@ -1028,65 +1024,74 @@ def _should_react(persona, retrieved, personas):
     return ((x1-x2)**2 + (y1-y2)**2) ** 0.5
 
   def lets_talk(init_persona, target_persona, retrieved):
-    # 注意：专家也可以参与日常对话，收集民意
-    # 不再阻止专家对话
-
+    """
+    逻辑：
+    - 距离 <= 5 格: 直接对话
+    - 5 < 距离 <= 20 格: 0.8 概率走过去 (approach)
+    - 防止互相追逐：如果对方已在 approaching 我，我等待
+    """
+    # 基础检查
     if (not target_persona.scratch.act_address 
         or not target_persona.scratch.act_description
         or not init_persona.scratch.act_address
         or not init_persona.scratch.act_description): 
       return False
-    
-    # 计算距离
-    dist = get_distance(init_persona, target_persona)
-    
-    # 如果距离在视野范围内（20格）但超过5格，返回特殊值表示需要走过去
-    if 5 < dist <= 20:
-      return "approach"  # 需要走过去
-    
-    # 如果超出视野范围，不触发对话
-    if dist > 20:
-      return False
 
+    # 睡觉中不对话/不走近
     if ("sleeping" in target_persona.scratch.act_description 
         or "sleeping" in init_persona.scratch.act_description): 
       return False
 
+    # 23点后不对话
     if init_persona.scratch.curr_time.hour == 23: 
       return False
 
+    # 等待中不对话
     if "<waiting>" in target_persona.scratch.act_address: 
       return False
 
+    # 已经在对话中不重复对话
     if (target_persona.scratch.chatting_with 
       or init_persona.scratch.chatting_with): 
       return False
 
+    # 冷却期内不对话
     if (target_persona.name in init_persona.scratch.chatting_with_buffer): 
       if init_persona.scratch.chatting_with_buffer[target_persona.name] > 0: 
         return False
 
-    # Local "social hour" bias: when two personas are at the same location
-    # during key social windows, we give them an additional chance to start
-    # talking without relying solely on the LLM decision. This does not add
-    # any extra API calls and simply makes encounters more lively.
-    same_place = (init_persona.scratch.act_address 
-                  == target_persona.scratch.act_address)
-    hour = init_persona.scratch.curr_time.hour
+    # 防止互相追逐：
+    # 1. 如果我已经在 approaching 别人，不再触发新的 approach
+    if (init_persona.scratch.act_event and 
+        len(init_persona.scratch.act_event) >= 2 and
+        init_persona.scratch.act_event[1] == "approaching"):
+      return False
     
-    # 扩大社交时间范围：6am-11pm 都可以对话
-    if same_place and 6 <= hour <= 23:
-      # 同一地点时，90% 概率触发对话
-      if random.random() < 0.9:
-        return True
+    # 2. 如果对方已经在 approaching 我，我等待不动
+    if (target_persona.scratch.act_event and 
+        len(target_persona.scratch.act_event) >= 3 and
+        target_persona.scratch.act_event[1] == "approaching" and
+        target_persona.scratch.act_event[2] == init_persona.scratch.name):
+      return "wait_for_approach"
+
+    # 计算距离
+    dist = get_distance(init_persona, target_persona)
     
-    # 即使不在同一地点，也有小概率主动去找人聊天
-    if random.random() < 0.5:
+    # 距离 > 20 格: 看不到
+    if dist > 20:
+      return False
+    
+    # 距离 <= 5 格: 直接对话！
+    if dist <= 5:
+      print(f"[Talk] {init_persona.scratch.name} 与 {target_persona.scratch.name} 距离 {dist:.1f} 格，开始对话")
       return True
-
-    if generate_decide_to_talk(init_persona, target_persona, retrieved): 
-      return True
-
+    
+    # 5 < 距离 <= 20 格: 0.8 概率走过去
+    approach_probability = 0.8
+    if random.random() < approach_probability:
+      print(f"[Approach] {init_persona.scratch.name} 决定走向 {target_persona.scratch.name} (距离 {dist:.1f} 格)")
+      return "approach"
+    
     return False
 
   def lets_react(init_persona, target_persona, retrieved): 
@@ -1106,11 +1111,24 @@ def _should_react(persona, retrieved, personas):
 
     if "waiting" in target_persona.scratch.act_description: 
       return False
+    
+    # 检查是否在同一区域（地址前3级相同，如 the Ville:Hobbs Cafe:cafe）
+    def get_area(addr):
+      if not addr:
+        return ""
+      parts = addr.split(":")
+      return ":".join(parts[:3]) if len(parts) >= 3 else addr
+    
+    init_area = get_area(init_persona.scratch.act_address)
+    target_area = get_area(target_persona.scratch.act_address)
+    
+    # 如果路径为空但在同一区域，仍可触发对话
     if init_persona.scratch.planned_path == []:
-      return False
+      if init_area != target_area:
+        return False
+      # 在同一区域，允许对话
 
-    if (init_persona.scratch.act_address 
-        != target_persona.scratch.act_address): 
+    if init_area != target_area: 
       return False
 
     react_mode = generate_decide_to_react(init_persona, 
@@ -1143,11 +1161,13 @@ def _should_react(persona, retrieved, personas):
     # this is a persona event. 
     talk_result = lets_talk(persona, personas[curr_event.subject], retrieved)
     
-    if talk_result == "approach":
-      # 在视野范围内但距离超过5格，走过去
-      return f"approach {curr_event.subject}"
-    elif talk_result == True:
+    if talk_result == True:
       return f"chat with {curr_event.subject}"
+    elif talk_result == "approach":
+      return f"approach {curr_event.subject}"
+    elif talk_result == "wait_for_approach":
+      # 对方正在走过来，我原地等待
+      return False
     
     react_mode = lets_react(persona, personas[curr_event.subject], 
                             retrieved)
@@ -1218,6 +1238,11 @@ def _chat_react(maze, persona, focused_event, reaction_mode, personas):
 
   # Actually creating the conversation here. 
   convo_result = generate_convo(maze, init_persona, target_persona)
+  
+  # 检查对话生成是否成功
+  if not convo_result or len(convo_result) < 2:
+    print(f"[Warning] 对话生成失败: {init_persona.scratch.name} -> {target_persona.scratch.name}")
+    return  # 跳过这次对话
   
   # 处理新的返回格式 (convo, duration_min, convo_with_sentiment)
   if isinstance(convo_result, tuple) and len(convo_result) == 3:
@@ -1345,24 +1370,24 @@ def plan(persona, maze, personas, new_day, retrieved):
       if reaction_mode[:9] == "chat with":
         _chat_react(maze, persona, focused_event, reaction_mode, personas)
       elif reaction_mode[:8] == "approach":
-        # 走向目标人物，更新路径
+        # 走向目标人物
         target_name = reaction_mode[9:].strip()
         if target_name in personas:
           target = personas[target_name]
           if target.scratch.curr_tile:
-            # 设置目标位置为对方当前位置
+            # 只更新路径，不改变图标/描述
             persona.scratch.planned_path = maze.find_path(
               persona.scratch.curr_tile, target.scratch.curr_tile)
-            print(f"[Approach] {persona.scratch.name} walking towards {target_name}")
+            # 设置 act_event 用于追踪 approaching 状态（防止互相追）
+            persona.scratch.act_event = (persona.scratch.name, "approaching", target_name)
+            print(f"[Approach] {persona.scratch.name} walking towards {target_name} (path set)")
       elif reaction_mode[:4] == "wait": 
         _wait_react(persona, reaction_mode)
-      # elif reaction_mode == "do other things": 
-      #   _chat_react(persona, focused_event, reaction_mode, personas)
 
   # Step 3: Chat-related state clean up. 
   # If the persona is not chatting with anyone, we clean up any of the 
   # chat-related states here. 
-  if persona.scratch.act_event[1] != "chat with":
+  if persona.scratch.act_event[1] not in ["chat with", "approaching"]:
     persona.scratch.chatting_with = None
     persona.scratch.chat = None
     persona.scratch.chatting_end_time = None

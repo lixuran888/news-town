@@ -447,6 +447,18 @@ def run_gpt_prompt_generate_hourly_schedule(persona,
     if target.endswith("."):
       target = target[:-1].strip()
 
+    # 过滤无效的描述（解释性文字而非动作）
+    invalid_keywords = [
+      "complete and consistent",
+      "hourly schedule",
+      "schedule for",
+      "日程安排",
+      "根据",
+      "这里为您",
+    ]
+    if any(kw in target.lower() for kw in invalid_keywords):
+      return ""  # 返回空，让 fail_safe 生效
+
     return target
 
   def __func_validate(gpt_response, prompt=""): 
@@ -460,7 +472,7 @@ def run_gpt_prompt_generate_hourly_schedule(persona,
     fs = "asleep"
     return fs
 
-  gpt_param = {"engine": "text-davinci-003", "max_tokens": 30, 
+  gpt_param = {"engine": "text-davinci-003", "max_tokens": 60, 
                "temperature": 0.5, "top_p": 1, "stream": False,
                "frequency_penalty": 0, "presence_penalty": 0, "stop": ["\n"]}
   prompt_template = "persona/prompt_template/v2/generate_hourly_schedule_v2.txt"
@@ -2416,13 +2428,14 @@ def run_gpt_prompt_agent_chat_summarize_ideas(persona, target_persona, statement
   def create_prompt_input(persona, target_persona, statements, curr_context, test_input=None): 
     """构造用于概括对话要点的输入。
 
-    在原有的日期、当前情境、人物背景和相关记忆基础上，增加一条显式指示：
-    如果最近记忆中包含与某起公共事件（例如校园食物中毒、学校事故等）直接相关的记录，
-    请优先围绕这些最新的公共事件展开对话，而不是沉溺于过往的旧故事。
+    根据记忆的新鲜程度和重要性自然生成对话要点。
+    如果有非常新且重要的公共事件记忆，可以适当提及；
+    如果相关记忆已经衰减，也可以聊日常话题，让舆论自然兴衰。
     """
-    guidance = ("如果最近的记忆中包含与某起公共事件（例如校园食物中毒、学校事故、校园安全事件等）" 
-                "直接相关的记录，请在生成接下来的对话要点时，优先围绕这些最新的公共事件展开，" 
-                "关注民众的担忧、质疑和讨论，而不要过多停留在与当前公共事件无关的旧故事上。")
+    guidance = ("请根据最近记忆的重要性和新鲜程度自然生成对话要点。"
+                "如果记忆中有非常新且重要的公共事件（如校园安全事件），可以适当提及并讨论；"
+                "但如果相关记忆已经不那么新鲜或重要性较低，也可以聊其他日常话题（如工作、学习、兴趣爱好等），"
+                "这样更符合真实的社交对话模式，让舆论话题自然地兴起和消退。")
 
     prompt_input = [persona.scratch.get_str_curr_date_str(), curr_context, persona.scratch.currently,
                     guidance, statements, persona.scratch.name, target_persona.scratch.name]

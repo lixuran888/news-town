@@ -481,9 +481,14 @@ class ReverieServer:
               self.maze, self.personas, self.personas_tile[persona_name], 
               self.curr_time)
 
-            # 对 Public Health Expert：在 23:00 之后不向前端输出坐标
-            if (persona_name == "Public Health Expert" and
-                self.curr_time.hour >= 23):
+            # 专家和主持人在 23:00 后从界面消失
+            experts_and_moderator = [
+              "Public Health Expert",
+              "Market Supervision Expert", 
+              "Education Bureau Representative",
+              "Meeting Moderator"
+            ]
+            if persona_name in experts_and_moderator and self.curr_time.hour >= 23:
               continue
 
             movements["persona"][persona_name] = {}
@@ -517,6 +522,14 @@ class ReverieServer:
           # current time moves by <sec_per_step> amount. 
           self.step += 1
           self.curr_time += datetime.timedelta(seconds=self.sec_per_step)
+
+          # 每 50 步自动保存一次记忆（无 LLM 调用，纯文件写入）
+          if self.step % 50 == 0:
+            try:
+              self.save()
+              print(f"[AutoSave] 第 {self.step} 步，记忆已保存")
+            except Exception as e:
+              print(f"[AutoSave] 保存失败: {e}")
 
           # 在 10:55 触发一次：会议前收集民意并写入专家记忆
           try:

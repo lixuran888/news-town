@@ -44,15 +44,26 @@ def generate_insights_and_evidence(persona, nodes, n=5):
 
   ret = run_gpt_prompt_insight_and_guidance(persona, statements, n)[0]
 
-  print (ret)
+  print(ret)
+  
+  if not ret or not isinstance(ret, dict):
+    print(f"[Warning] LLM 返回无效: {ret}")
+    return {}
+  
   try: 
-
+    valid_ret = {}
     for thought, evi_raw in ret.items(): 
-      evidence_node_id = [nodes[i].node_id for i in evi_raw]
-      ret[thought] = evidence_node_id
-    return ret
-  except: 
-    return {"this is blank": "node_1"} 
+      # 过滤越界索引
+      valid_indices = [i for i in evi_raw if 0 <= i < len(nodes)]
+      if valid_indices:
+        evidence_node_id = [nodes[i].node_id for i in valid_indices]
+        valid_ret[thought] = evidence_node_id
+      else:
+        print(f"[Warning] 反思 '{thought[:30]}...' 的证据索引无效: {evi_raw}")
+    return valid_ret
+  except Exception as e: 
+    print(f"[Warning] generate_insights_and_evidence 解析失败: {e}")
+    return {} 
 
 
 def generate_action_event_triple(act_desp, persona): 

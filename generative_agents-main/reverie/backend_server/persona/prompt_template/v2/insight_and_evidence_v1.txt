@@ -8,5 +8,14 @@ Variables:
 Input:
 !<INPUT 0>!
 
-What !<INPUT 1>! high-level insights can you infer from the above statements? (example format: insight (because of 1, 5, 3))
+Based on the above statements, provide !<INPUT 1>! high-level insights.
+
+IMPORTANT: You MUST follow this EXACT format for each insight:
+[insight text] (because of [number], [number], ...)
+
+Example output:
+1. People are worried about food safety (because of 0, 2, 5)
+2. The community needs better regulations (because of 1, 3)
+
+Now provide your insights:
 1.
