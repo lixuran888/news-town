@@ -18,6 +18,8 @@ from django.urls import path
 from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.static import serve
+import os
 
 from translator import views as translator_views
 
@@ -31,5 +33,9 @@ urlpatterns = [
     url(r'^update_environment/$', translator_views.update_environment, name='update_environment'),
     url(r'^path_tester/$', translator_views.path_tester, name='path_tester'),
     url(r'^path_tester_update/$', translator_views.path_tester_update, name='path_tester_update'),
+    url(r'^seminar_expert/(?P<path>.*)$', serve, {
+        'document_root': os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'seminar_expert'),
+    }),
+    url(r'^expert_meeting_trigger.flag$', translator_views.expert_meeting_trigger, name='expert_meeting_trigger'),
     path('admin/', admin.site.urls),
 ]

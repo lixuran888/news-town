@@ -40,6 +40,28 @@ from expert_init import (
   generate_and_broadcast_public_opinion,
 )
 from opinion_collector import collect_and_inject_opinions
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+# 添加expert_system工具目录到路径
+# 从当前文件位置: generative_agents-main/generative_agents-main/reverie/backend_server/reverie.py
+# 需要回到: generative_agents-main/seminar_expert/expert_system
+expert_system_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'seminar_expert', 'expert_system')
+expert_system_path = os.path.abspath(expert_system_path)  # 转换为绝对路径
+sys.path.append(expert_system_path)
+
+print(f"[Reverie] 尝试从路径加载专家模块: {expert_system_path}")
+print(f"[Reverie] 路径是否存在: {os.path.exists(expert_system_path)}")
+
+try:
+    from expert_position_monitor import ExpertPositionMonitor
+    EXPERT_MONITOR_AVAILABLE = True
+    print("[Reverie] 专家位置监控模块已加载")
+except ImportError as e:
+    print(f"[Reverie] 专家位置监控模块加载失败: {e}")
+    print(f"[Reverie] 当前 sys.path: {sys.path[-3:]}")  # 显示最后3个路径
+    EXPERT_MONITOR_AVAILABLE = False
+    ExpertPositionMonitor = None
 
 ##############################################################################
 #                                  REVERIE                                   #
@@ -91,11 +113,11 @@ class ReverieServer:
     reverie_meta["step"] = 0
 
     # 约定：只要是从 base_the_ville_clean fork 出来的世界线，
-    # 第一日的 curr_time 一律从早上 08:00:00 开始。后续仍按
+    # 第一日的 curr_time 一律从晚上 22:40:00 开始。后续仍按
     # sec_per_step 正常推进 24 小时，不受影响。
     if reverie_meta.get("fork_sim_code") == "base_the_ville_clean":
       date_str = reverie_meta.get("start_date", "February 13, 2023")
-      reverie_meta["curr_time"] = f"{date_str}, 08:00:00"
+      reverie_meta["curr_time"] = f"{date_str}, 22:40:00"
 
     with open(f"{sim_folder}/reverie/meta.json", "w") as outfile: 
       outfile.write(json.dumps(reverie_meta, indent=2))
@@ -177,7 +199,17 @@ class ReverieServer:
       # Reverie 的 curr_time 作为一个全新的 "First day" 重新规划日程。
       s = curr_persona.scratch
       s.curr_time = None
-      s.daily_plan_req = None
+      
+      # 专家保留daily_plan_req，普通agent清空
+      experts_and_moderator = [
+        "Public Health Expert",
+        "Market Supervision Expert", 
+        "Education Bureau Representative",
+        "Meeting Moderator"
+      ]
+      if curr_persona.name not in experts_and_moderator:
+        s.daily_plan_req = None
+      
       s.daily_req = []
       s.f_daily_schedule = []
       s.f_daily_schedule_hourly_org = []
@@ -215,6 +247,15 @@ class ReverieServer:
     # <server_sleep> denotes the amount of time that our while loop rests each
     # cycle; this is to not kill our machine. 
     self.server_sleep = 0.1
+    
+    # EXPERT POSITION MONITOR:
+    # Initialize expert position monitor for 23:00 trigger
+    if EXPERT_MONITOR_AVAILABLE:
+      self.expert_monitor = ExpertPositionMonitor(f"{fs_storage}/{self.sim_code}")
+      self.expert_monitor_started = False
+    else:
+      self.expert_monitor = None
+      self.expert_monitor_started = False
 
     # SIGNALING THE FRONTEND SERVER: 
     # curr_sim_code.json contains the current simulation code, and
@@ -435,20 +476,34 @@ class ReverieServer:
           # crashing the whole simulation with a KeyError, we skip any
           # persona that does not appear in new_env for this step.
           for persona_name, persona in self.personas.items(): 
-            if persona_name not in new_env:
+            # 专家即使不在前端环境文件中也需要执行move()以生成行为
+            experts_and_moderator = [
+              "Public Health Expert",
+              "Market Supervision Expert", 
+              "Education Bureau Representative",
+              "Meeting Moderator"
+            ]
+            
+            if persona_name not in new_env and persona_name not in experts_and_moderator:
               continue
             # <curr_tile> is the tile that the persona was at previously. 
             curr_tile = self.personas_tile[persona_name]
-            # <new_tile> is the tile that the persona will move to right now,
-            # during this cycle. 
-            new_tile = (new_env[persona_name]["x"], 
-                        new_env[persona_name]["y"])
+            
+            # 如果专家不在new_env中，保持当前位置不变，但仍然执行move()
+            if persona_name in new_env:
+              # <new_tile> is the tile that the persona will move to right now,
+              # during this cycle. 
+              new_tile = (new_env[persona_name]["x"], 
+                          new_env[persona_name]["y"])
 
-            # We actually move the persona on the backend tile map here. 
-            self.personas_tile[persona_name] = new_tile
-            self.maze.remove_subject_events_from_tile(persona.name, curr_tile)
-            self.maze.add_event_from_tile(persona.scratch
-                                         .get_curr_event_and_desc(), new_tile)
+              # We actually move the persona on the backend tile map here. 
+              self.personas_tile[persona_name] = new_tile
+              self.maze.remove_subject_events_from_tile(persona.name, curr_tile)
+              self.maze.add_event_from_tile(persona.scratch
+                                           .get_curr_event_and_desc(), new_tile)
+            else:
+              # 专家不在前端环境中，保持当前位置
+              new_tile = curr_tile
 
             # Now, the persona will travel to get to their destination. *Once*
             # the persona gets there, we activate the object action.
@@ -481,22 +536,29 @@ class ReverieServer:
               self.maze, self.personas, self.personas_tile[persona_name], 
               self.curr_time)
 
-            # 专家和主持人在 23:00 后从界面消失
+            # 专家到达目标位置后才从界面消失
             experts_and_moderator = [
               "Public Health Expert",
               "Market Supervision Expert", 
               "Education Bureau Representative",
               "Meeting Moderator"
             ]
-            if persona_name in experts_and_moderator and self.curr_time.hour >= 23:
-              continue
-
-            movements["persona"][persona_name] = {}
-            movements["persona"][persona_name]["movement"] = next_tile
-            movements["persona"][persona_name]["pronunciatio"] = pronunciatio
-            movements["persona"][persona_name]["description"] = description
-            movements["persona"][persona_name]["chat"] = (persona
-                                                          .scratch.chat)
+            
+            # 检查专家是否已到达目标位置并应该隐藏
+            should_hide_expert = False
+            if (persona_name in experts_and_moderator and 
+                EXPERT_MONITOR_AVAILABLE and self.expert_monitor and 
+                hasattr(self.expert_monitor, 'experts_arrived')):
+              should_hide_expert = persona_name in self.expert_monitor.experts_arrived
+            
+            # 只有到达目标位置的专家才隐藏
+            if not should_hide_expert:
+              movements["persona"][persona_name] = {}
+              movements["persona"][persona_name]["movement"] = next_tile
+              movements["persona"][persona_name]["pronunciatio"] = pronunciatio
+              movements["persona"][persona_name]["description"] = description
+              movements["persona"][persona_name]["chat"] = (persona
+                                                            .scratch.chat)
 
           # Include the meta information about the current stage in the 
           # movements dictionary. 
@@ -531,9 +593,9 @@ class ReverieServer:
             except Exception as e:
               print(f"[AutoSave] 保存失败: {e}")
 
-          # 在 10:55 触发一次：会议前收集民意并写入专家记忆
+          # 在 22:55 触发一次：收集民意并写入专家记忆
           try:
-            if self.curr_time.hour == 10 and self.curr_time.minute >= 55:
+            if self.curr_time.hour == 22 and self.curr_time.minute >= 55:
               curr_date = self.curr_time.date()
               if not hasattr(self, 'last_opinion_collection_date') or self.last_opinion_collection_date != curr_date:
                 print(f"\n[Reverie] 触发会议前民意收集 @ {self.curr_time}")
@@ -553,8 +615,36 @@ class ReverieServer:
                   self.curr_time,
                 )
                 self.last_public_opinion_date = curr_date
+                
+              # 23:00后开始检查专家位置（无需启动监控）
+              if EXPERT_MONITOR_AVAILABLE and self.expert_monitor:
+                self.expert_monitor_started = True
+                
           except Exception:
             # 不让舆论模块的异常影响主循环
+            pass
+          
+          # 检查专家位置监控触发
+          try:
+            if (EXPERT_MONITOR_AVAILABLE and self.expert_monitor and 
+                self.expert_monitor_started and not self.expert_monitor.trigger_sent):
+              # 直接从内存中的位置数据获取专家位置
+              for expert_name in ["Education Bureau Representative", "Meeting Moderator", 
+                                "Public Health Expert", "Market Supervision Expert"]:
+                expert_pos = self.personas_tile.get(expert_name)
+                
+                # 检查是否到达目标位置
+                if self.expert_monitor.is_at_target_position(expert_pos):
+                  if expert_name not in self.expert_monitor.experts_arrived:
+                    self.expert_monitor.experts_arrived.add(expert_name)
+                    print(f"[Monitor] ✓ {expert_name} 已到达目标位置 {expert_pos}")
+              
+              # 检查是否所有专家都到达
+              if len(self.expert_monitor.experts_arrived) == 4:
+                self.expert_monitor.trigger_expert_meeting()
+                
+          except Exception as e:
+            print(f"[Reverie] 专家位置监控异常: {e}")
             pass
 
           int_counter -= 1

@@ -11,4 +11,12 @@ Variables:
 !<INPUT 0>!
 
 In general, !<INPUT 1>!
+
+IMPORTANT: This is a PUBLIC OPINION SIMULATION TOWN. Social interaction and conversation are the TOP PRIORITY.
+- Talking with friends and neighbors is MORE IMPORTANT than solitary activities like studying or working alone.
+- When planning, ALWAYS include time to chat with people at public places (Hobbs Cafe, Johnson Park, The Rose and Crown Pub).
+- If the character sees someone they know, they should stop and have a conversation.
+- Recent events (like the campus food poisoning incident) are hot topics that everyone wants to discuss.
+- Use the Relationships info above to plan who they might seek out to talk with.
+
 Today is !<INPUT 2>!. Here is !<INPUT 3>!'s plan today in broad-strokes (with the time of the day. e.g., have a lunch at 12:00 pm, watch TV from 7 to 8 pm): 1) wake up and complete the morning routine at !<INPUT 4>!, 2)

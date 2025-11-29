@@ -20,6 +20,7 @@ from global_methods import *
 
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from .models import *
+from pathlib import Path
 
 # 情感分析模块
 try:
@@ -409,6 +410,26 @@ def path_tester_update(request):
   return HttpResponse("received")
 
 
+def expert_meeting_trigger(request):
+  """
+  提供专家会议触发文件的API端点
+  当所有专家到达指定位置时，后端会创建触发文件，前端通过此API获取
+  """
+  try:
+    trigger_file_path = Path("expert_meeting_trigger.flag")
+    
+    if trigger_file_path.exists():
+      with open(trigger_file_path, 'r', encoding='utf-8') as f:
+        trigger_data = json.load(f)
+      
+      # 返回触发数据
+      return JsonResponse(trigger_data)
+    else:
+      # 文件不存在，返回404
+      return JsonResponse({"error": "Trigger file not found"}, status=404)
+      
+  except Exception as e:
+    return JsonResponse({"error": str(e)}, status=500)
 
 
 

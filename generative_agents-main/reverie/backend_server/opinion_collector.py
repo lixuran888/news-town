@@ -44,60 +44,73 @@ def simple_sentiment(text):
 
 def collect_opinions_from_personas(personas, curr_time):
     """
-    从所有 persona 的记忆中收集对话言论
+    从所有 persona 的 event_opinions 中收集事件相关舆论
+    (新版：使用预提取的舆论观点，而非解析原始对话)
     
     Args:
         personas: dict of {name: Persona object}
         curr_time: 当前模拟时间
     
     Returns:
-        all_utterances: list of {speaker, text, sentiment}
-        by_persona: dict of {name: {positive, negative, neutral, total}}
+        all_utterances: list of {speaker, text, sentiment, stance}
+        by_persona: dict of {name: {positive, negative, neutral, total, stances}}
     """
     all_utterances = []
     by_persona = defaultdict(lambda: {
-        "positive": 0, "negative": 0, "neutral": 0, "total": 0
+        "positive": 0, "negative": 0, "neutral": 0, "total": 0,
+        "stances": {"supportive": 0, "critical": 0, "worried": 0, "neutral": 0, "angry": 0}
     })
     
-    seen_utterances = set()  # 避免重复
+    seen_opinions = set()  # 避免重复
     
-    # 遍历所有 persona 的记忆
+    # 遍历所有 persona 的 event_opinions
     for persona_name, persona in personas.items():
-        # 获取该 persona 的所有 chat 记忆
+        # 跳过专家
+        if persona_name in EXPERTS:
+            continue
+        
         try:
-            a_mem = persona.a_mem
-            # seq_chat 是一个列表
-            chat_list = a_mem.seq_chat if hasattr(a_mem, 'seq_chat') else []
+            # 获取预提取的事件舆论观点
+            event_opinions = getattr(persona.scratch, 'event_opinions', [])
             
-            for node in chat_list:
-                filling = node.filling if hasattr(node, 'filling') else []
-                for speaker, utt in filling:
-                    # 跳过专家的发言
-                    if speaker in EXPERTS:
-                        continue
-                    
-                    # 避免重复
-                    utt_key = f"{speaker}:{utt[:50]}"
-                    if utt_key in seen_utterances:
-                        continue
-                    seen_utterances.add(utt_key)
-                    
-                    # 情感分析
-                    if SENTIMENT_ENABLED:
-                        sentiment = analyze_sentiment(utt)
-                    else:
-                        sentiment = simple_sentiment(utt)
-                    
-                    label = sentiment["label"]
-                    by_persona[speaker][label] += 1
-                    by_persona[speaker]["total"] += 1
-                    all_utterances.append({
-                        "speaker": speaker,
-                        "text": utt,
-                        "sentiment": sentiment
-                    })
+            for opinion_data in event_opinions:
+                speaker = opinion_data.get("speaker", persona_name)
+                opinion_text = opinion_data.get("opinion", "")
+                stance = opinion_data.get("stance", "neutral")
+                
+                # 跳过空的或无效的
+                if not opinion_text or "no clear opinion" in opinion_text.lower():
+                    continue
+                
+                # 避免重复
+                opinion_key = f"{speaker}:{opinion_text[:50]}"
+                if opinion_key in seen_opinions:
+                    continue
+                seen_opinions.add(opinion_key)
+                
+                # 根据 stance 映射到情感
+                stance_to_sentiment = {
+                    "supportive": {"label": "positive", "score": 0.8},
+                    "critical": {"label": "negative", "score": -0.8},
+                    "worried": {"label": "negative", "score": -0.5},
+                    "angry": {"label": "negative", "score": -0.9},
+                    "neutral": {"label": "neutral", "score": 0.0}
+                }
+                sentiment = stance_to_sentiment.get(stance, {"label": "neutral", "score": 0.0})
+                
+                label = sentiment["label"]
+                by_persona[speaker][label] += 1
+                by_persona[speaker]["total"] += 1
+                by_persona[speaker]["stances"][stance] += 1
+                
+                all_utterances.append({
+                    "speaker": speaker,
+                    "text": opinion_text,
+                    "sentiment": sentiment,
+                    "stance": stance
+                })
+                
         except Exception as e:
-            # 某些 persona 可能没有 chat 记忆
             print(f"  [OpinionCollector] Warning: {persona_name} - {e}")
             pass
     

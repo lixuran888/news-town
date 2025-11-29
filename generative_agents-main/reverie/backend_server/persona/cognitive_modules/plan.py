@@ -562,10 +562,21 @@ def revise_identity(persona):
   daily_req_prompt += f"Follow this format (the list should have 4~6 items but no more):\n"
   daily_req_prompt += f"1. wake up and complete the morning routine at <time>, 2. ..."
 
-  new_daily_req = ChatGPT_single_request(daily_req_prompt)
-  new_daily_req = new_daily_req.replace('\n', ' ')
-  print ("WE ARE HERE!!!", new_daily_req)
-  persona.scratch.daily_plan_req = new_daily_req
+  # 专家保留原有的daily_plan_req，不重新生成
+  experts_and_moderator = [
+    "Public Health Expert",
+    "Market Supervision Expert", 
+    "Education Bureau Representative",
+    "Meeting Moderator"
+  ]
+  
+  if persona.scratch.name not in experts_and_moderator:
+    new_daily_req = ChatGPT_single_request(daily_req_prompt)
+    new_daily_req = new_daily_req.replace('\n', ' ')
+    print ("WE ARE HERE!!!", new_daily_req)
+    persona.scratch.daily_plan_req = new_daily_req
+  else:
+    print(f"专家 {persona.scratch.name} 保留原有daily_plan_req，不重新生成")
 
 
 def _seed_public_health_expert_food_poisoning_memory(persona):

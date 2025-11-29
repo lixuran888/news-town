@@ -152,6 +152,17 @@ class Scratch:
     self.pre_chat_act_description = None
     self.pre_chat_act_end_time = None
 
+    # 朋友关系
+    self.friends = {
+      "best_friends": [],
+      "good_friends": [],
+      "acquaintances": [],
+      "tensions": []
+    }
+
+    # 事件相关舆论观点
+    self.event_opinions = []
+
     # <path_set> is True if we've already calculated the path the persona will
     # take to execute this action. That path is stored in the persona's 
     # scratch.planned_path.
@@ -247,6 +258,17 @@ class Scratch:
       else:
         self.pre_chat_act_end_time = None
 
+      # 加载朋友关系
+      self.friends = scratch_load.get("friends", {
+        "best_friends": [],
+        "good_friends": [],
+        "acquaintances": [],
+        "tensions": []
+      })
+
+      # 加载事件舆论观点
+      self.event_opinions = scratch_load.get("event_opinions", [])
+
       self.act_path_set = scratch_load["act_path_set"]
       self.planned_path = scratch_load["planned_path"]
 
@@ -328,6 +350,12 @@ class Scratch:
                                            .strftime("%B %d, %Y, %H:%M:%S"))
     else:
       scratch["pre_chat_act_end_time"] = None
+
+    # 保存朋友关系
+    scratch["friends"] = self.friends
+
+    # 保存事件舆论观点
+    scratch["event_opinions"] = self.event_opinions
 
     scratch["act_path_set"] = self.act_path_set
     scratch["planned_path"] = self.planned_path
@@ -436,6 +464,18 @@ class Scratch:
     commonset += f"Currently: {self.currently}\n"
     commonset += f"Lifestyle: {self.lifestyle}\n"
     commonset += f"Daily plan requirement: {self.daily_plan_req}\n"
+    
+    # 添加朋友关系描述
+    friends_desc = []
+    if self.friends.get("best_friends"):
+      friends_desc.append(f"Best friends: {', '.join(self.friends['best_friends'])}")
+    if self.friends.get("good_friends"):
+      friends_desc.append(f"Good friends: {', '.join(self.friends['good_friends'])}")
+    if self.friends.get("tensions"):
+      friends_desc.append(f"Has tensions with: {', '.join(self.friends['tensions'])}")
+    if friends_desc:
+      commonset += f"Relationships: {'; '.join(friends_desc)}\n"
+    
     commonset += f"Current Date: {self.curr_time.strftime('%A %B %d')}\n"
     return commonset
 

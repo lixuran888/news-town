@@ -18,6 +18,105 @@ from persona.prompt_template.run_gpt_prompt import *
 from persona.prompt_template.gpt_structure import *
 from persona.cognitive_modules.retrieve import *
 
+def process_memo_thought(persona, other_name, memo_thought):
+  """
+  处理 memo_thought，一次性提取：
+  1. 关系变化 → 更新 friends
+  2. 事件舆论 → 存入 event_opinions
+  
+  memo_thought 格式: 
+  "{memo} | relationship: {xxx} | event_opinion: {xxx} | stance: {xxx}"
+  """
+  if not other_name or not memo_thought:
+    return
+  
+  memo_lower = memo_thought.lower()
+  
+  # ===== 1. 解析关系标签并更新 friends =====
+  relationship = "unchanged"
+  if "| relationship:" in memo_lower:
+    try:
+      # 提取 relationship 部分
+      rel_part = memo_lower.split("| relationship:")[1]
+      relationship = rel_part.split("|")[0].strip()
+      relationship = relationship.replace('"', '').replace("'", "").strip()
+    except:
+      relationship = "unchanged"
+  
+  friends = persona.scratch.friends
+  all_known = (friends.get("best_friends", []) + 
+               friends.get("good_friends", []) + 
+               friends.get("acquaintances", []) + 
+               friends.get("tensions", []))
+  is_new_person = other_name not in all_known
+  
+  # 新认识的人
+  if is_new_person or "new_acquaintance" in relationship:
+    if other_name not in friends.get("acquaintances", []):
+      if "acquaintances" not in friends:
+        friends["acquaintances"] = []
+      friends["acquaintances"].append(other_name)
+      print(f"[Friends] {persona.scratch.name} 新认识了 {other_name}")
+  
+  # 关系恶化
+  elif "worsened" in relationship:
+    if other_name not in friends.get("tensions", []):
+      if "tensions" not in friends:
+        friends["tensions"] = []
+      friends["tensions"].append(other_name)
+      print(f"[Friends] {persona.scratch.name} 与 {other_name} 关系恶化")
+  
+  # 关系改善
+  elif "improved" in relationship:
+    if other_name in friends.get("acquaintances", []):
+      friends["acquaintances"].remove(other_name)
+      if "good_friends" not in friends:
+        friends["good_friends"] = []
+      if other_name not in friends["good_friends"]:
+        friends["good_friends"].append(other_name)
+        print(f"[Friends] {persona.scratch.name} 与 {other_name} 升级为 good_friends")
+    if other_name in friends.get("tensions", []):
+      friends["tensions"].remove(other_name)
+      print(f"[Friends] {persona.scratch.name} 与 {other_name} 和解")
+
+  # ===== 2. 解析事件舆论并存入 event_opinions =====
+  event_opinion = None
+  stance = "none"
+  
+  if "| event_opinion:" in memo_lower:
+    try:
+      # 提取 event_opinion 部分
+      opinion_part = memo_lower.split("| event_opinion:")[1]
+      event_opinion = opinion_part.split("| stance:")[0].strip()
+      event_opinion = event_opinion.replace('"', '').replace("'", "").strip()
+      
+      # 提取 stance
+      if "| stance:" in memo_lower:
+        stance_part = memo_lower.split("| stance:")[1]
+        stance = stance_part.split("|")[0].strip()
+        stance = stance.replace('"', '').replace("'", "").strip()
+    except:
+      pass
+  
+  # 如果有有效的事件舆论，存入 event_opinions
+  if event_opinion and event_opinion != "none" and len(event_opinion) > 5:
+    if not hasattr(persona.scratch, 'event_opinions'):
+      persona.scratch.event_opinions = []
+    
+    # 避免重复
+    existing = [o.get("opinion", "")[:30] for o in persona.scratch.event_opinions]
+    if event_opinion[:30] not in existing:
+      opinion_data = {
+        "speaker": persona.scratch.name,
+        "other": other_name,
+        "opinion": event_opinion,
+        "stance": stance if stance != "none" else "neutral",
+        "time": persona.scratch.curr_time.strftime("%H:%M") if persona.scratch.curr_time else "unknown"
+      }
+      persona.scratch.event_opinions.append(opinion_data)
+      print(f"[EventOpinion] {persona.scratch.name}: {stance} - {event_opinion[:50]}...")
+
+
 def generate_focal_points(persona, n=3): 
   if debug: print ("GNS FUNCTION: <generate_focal_points>")
   
@@ -254,11 +353,16 @@ def reflect(persona):
                                 memo_thought, keywords, thought_poignancy, 
                                 thought_embedding_pair, evidence)
 
+      # 一次性处理：更新朋友关系 + 提取事件舆论
+      process_memo_thought(persona, 
+                           persona.scratch.chatting_with, 
+                           memo_thought)
 
-
-
-
-
+      # 清空对话状态，标记对话已结束
+      print(f"[Chat End] {persona.scratch.name} 与 {persona.scratch.chatting_with} 的对话结束")
+      persona.scratch.chatting_with = None
+      persona.scratch.chat = None
+      persona.scratch.chatting_end_time = None
 
 
 

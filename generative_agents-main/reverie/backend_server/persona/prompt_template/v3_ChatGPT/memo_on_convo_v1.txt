@@ -10,6 +10,19 @@ Variables:
 [Conversation]
 !<INPUT 0>!
 
-Write down if there is anything from the conversation that !<INPUT 1>! might have found interesting from !<INPUT 2>!'s perspective, in a full sentence. 
+Based on this conversation, write a brief memo for !<INPUT 1>!. Include:
+1. What they found interesting or notable
+2. How this affected their relationship with the other person
+3. If they discussed the campus food poisoning incident, what is their opinion/stance on it
+
+Output format (must follow exactly, one line):
+{memo} | relationship: {improved/worsened/unchanged/new_acquaintance} | event_opinion: {opinion about food poisoning or none} | stance: {supportive/critical/worried/neutral/angry/none}
+
+Examples:
+- "discussed food poisoning concerns | relationship: unchanged | event_opinion: believes school should close cafeteria for inspection | stance: critical"
+- "had a great chat about video games | relationship: improved | event_opinion: none | stance: none"
+- "shared worries about getting sick from cafeteria | relationship: unchanged | event_opinion: worried about health, wants more transparency | stance: worried"
+- "met for the first time, introduced ourselves | relationship: new_acquaintance | event_opinion: none | stance: none"
+- "argued about school's response to incident | relationship: worsened | event_opinion: thinks school is covering up the truth | stance: angry"
 
 "!<INPUT 3>!
