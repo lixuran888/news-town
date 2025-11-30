@@ -4,7 +4,7 @@
   "retention": 8,
   "curr_time": null,
   "curr_tile": null,
-  "daily_plan_req": "Education Bureau Representative has flexible daily activities based on his professional needs - he may prepare reports, visit different locations in town, observe residents, or conduct informal interviews. His schedule can vary each day depending on current priorities and situations. However, at 11:00pm (23:00) he MUST immediately leave whatever he is doing and walk directly toward the meeting location at coordinates (145, 50) for the expert consultation meeting. This 23:00 meeting is mandatory and cannot be delayed under any circumstances.",
+  "daily_plan_req": "Education Bureau Representative prepares reports, visits locations, observes residents, conducts interviews about educational impact of food poisoning.",
   "name": "Education Bureau Representative",
   "first_name": "Education Bureau",
   "last_name": "Representative",

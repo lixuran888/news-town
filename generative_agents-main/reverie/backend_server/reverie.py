@@ -536,13 +536,36 @@ class ReverieServer:
               self.maze, self.personas, self.personas_tile[persona_name], 
               self.curr_time)
 
-            # 专家到达目标位置后才从界面消失
+            # ========== 专家23:00强制移动到会议地点 ==========
+            # 停下一切工作（对话、睡觉等），立即移动到目标位置！
             experts_and_moderator = [
               "Public Health Expert",
               "Market Supervision Expert", 
               "Education Bureau Representative",
               "Meeting Moderator"
             ]
+            EXPERT_MEETING_TARGET = (139, 50)  # 地图最右边边缘
+            
+            if persona_name in experts_and_moderator and self.curr_time.hour >= 23:
+              curr_pos = self.personas_tile[persona_name]
+              target = EXPERT_MEETING_TARGET
+              
+              # 如果还没到达目标位置，强制向目标移动
+              if curr_pos != target:
+                # 计算下一步移动位置（向目标方向移动一步）
+                dx = 1 if target[0] > curr_pos[0] else (-1 if target[0] < curr_pos[0] else 0)
+                dy = 1 if target[1] > curr_pos[1] else (-1 if target[1] < curr_pos[1] else 0)
+                next_tile = (curr_pos[0] + dx, curr_pos[1] + dy)
+                pronunciatio = "🚨"
+                description = f"URGENT: walking to expert meeting at {target}"
+                
+                # 强制停止对话！
+                persona.scratch.chat = None
+                persona.scratch.chatting_with = None
+                persona.scratch.chatting_end_time = None
+                
+                print(f"🚨 强制移动: {persona_name} 从 {curr_pos} 向 {target}，下一步 {next_tile}")
+            # ========== 专家强制移动结束 ==========
             
             # 检查专家是否已到达目标位置并应该隐藏
             should_hide_expert = False

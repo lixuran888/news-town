@@ -18,8 +18,8 @@ EXPERTS = [
     "Market Supervision Expert"
 ]
 
-# 目标位置 (地图右边缘外)
-TARGET_X = 145  # 地图宽度140 + 5
+# 目标位置 (地图最右边边缘)
+TARGET_X = 139  # 地图宽度140，最大x=139
 TARGET_Y = 50   # 地图高度100的中间点
 POSITION_TOLERANCE = 3  # 位置容差
 

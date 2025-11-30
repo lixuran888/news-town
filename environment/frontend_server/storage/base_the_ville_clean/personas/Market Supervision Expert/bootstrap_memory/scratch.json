@@ -4,7 +4,7 @@
   "retention": 8,
   "curr_time": null,
   "curr_tile": null,
-  "daily_plan_req": "Market Supervision Expert has dynamic daily activities related to market oversight - he may analyze market data, inspect food establishments, interview business owners, observe consumer behavior, or investigate compliance issues. His schedule varies based on market conditions and regulatory priorities. However, at 11:00pm (23:00) he MUST immediately abandon all current activities and walk directly toward the meeting location at coordinates (145, 50) for the expert consultation meeting. This 23:00 meeting is absolutely mandatory and takes priority over all other tasks.",
+  "daily_plan_req": "Market Supervision Expert analyzes market data, inspects food establishments, interviews business owners about food safety compliance.",
   "name": "Market Supervision Expert",
   "first_name": "Market Supervision",
   "last_name": "Expert",

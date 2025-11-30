@@ -102,24 +102,44 @@ def generate_hourly_schedule(persona, wake_up_hour):
   """
   if debug: print ("GNS FUNCTION: <generate_hourly_schedule>")
 
-  hour_str = ["00:00 AM", "01:00 AM", "02:00 AM", "03:00 AM", "04:00 AM", 
-              "05:00 AM", "06:00 AM", "07:00 AM", "08:00 AM", "09:00 AM", 
-              "10:00 AM", "11:00 AM", "12:00 PM", "01:00 PM", "02:00 PM", 
-              "03:00 PM", "04:00 PM", "05:00 PM", "06:00 PM", "07:00 PM",
-              "08:00 PM", "09:00 PM", "10:00 PM", "11:00 PM"]
-  n_m1_activity = []
+  # ========== 分段生成策略：避免token截断 ==========
+  # 第一段：0-12点（上午）
+  hour_str_morning = ["00:00 AM", "01:00 AM", "02:00 AM", "03:00 AM", "04:00 AM", 
+                      "05:00 AM", "06:00 AM", "07:00 AM", "08:00 AM", "09:00 AM", 
+                      "10:00 AM", "11:00 AM"]
+  # 第二段：12-24点（下午）
+  hour_str_afternoon = ["12:00 PM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", 
+                        "05:00 PM", "06:00 PM", "07:00 PM", "08:00 PM", "09:00 PM",
+                        "10:00 PM", "11:00 PM"]
+  
+  morning_activity = []
+  afternoon_activity = []
   diversity_repeat_count = 3
+  
+  # 第一段：生成上午日程 (0-12点)
   for i in range(diversity_repeat_count): 
-    n_m1_activity_set = set(n_m1_activity)
-    if len(n_m1_activity_set) < 5: 
-      n_m1_activity = []
-      for count, curr_hour_str in enumerate(hour_str): 
-        if wake_up_hour > 0: 
-          n_m1_activity += ["sleeping"]
-          wake_up_hour -= 1
+    if len(set(morning_activity)) < 5: 
+      morning_activity = []
+      temp_wake = wake_up_hour
+      for curr_hour_str in hour_str_morning: 
+        if temp_wake > 0: 
+          morning_activity += ["sleeping"]
+          temp_wake -= 1
         else: 
-          n_m1_activity += [run_gpt_prompt_generate_hourly_schedule(
-                          persona, curr_hour_str, n_m1_activity, hour_str)[0]]
+          morning_activity += [run_gpt_prompt_generate_hourly_schedule(
+                          persona, curr_hour_str, morning_activity, hour_str_morning)[0]]
+  
+  # 第二段：生成下午日程 (12-24点)
+  for i in range(diversity_repeat_count): 
+    if len(set(afternoon_activity)) < 5: 
+      afternoon_activity = []
+      for curr_hour_str in hour_str_afternoon: 
+        afternoon_activity += [run_gpt_prompt_generate_hourly_schedule(
+                        persona, curr_hour_str, morning_activity + afternoon_activity, hour_str_afternoon)[0]]
+  
+  # 合并上午和下午日程
+  n_m1_activity = morning_activity + afternoon_activity
+  print(f"✅ {persona.scratch.name} 分段生成完成：上午{len(morning_activity)}项 + 下午{len(afternoon_activity)}项")
   
   # Step 1. Compressing the hourly schedule to the following format: 
   # The integer indicates the number of hours. They should add up to 24. 
@@ -147,6 +167,44 @@ def generate_hourly_schedule(persona, wake_up_hour):
   n_m1_hourly_compressed = []
   for task, duration in _n_m1_hourly_compressed: 
     n_m1_hourly_compressed += [[task, duration*60]]
+
+  # ========== 确保所有agent日程完整24小时 ==========
+  experts_and_moderator = [
+    "Public Health Expert",
+    "Market Supervision Expert", 
+    "Education Bureau Representative",
+    "Meeting Moderator"
+  ]
+  is_expert = persona.scratch.name in experts_and_moderator
+  total_minutes = sum(item[1] for item in n_m1_hourly_compressed)
+
+  if is_expert:
+    # 专家：截断到23:00，强制添加移动任务
+    meeting_start = 1380  # 23:00
+    kept = []
+    curr = 0
+    for task, dur in n_m1_hourly_compressed:
+      if curr + dur <= meeting_start:
+        kept.append([task, dur])
+        curr += dur
+      else:
+        if meeting_start - curr > 0:
+          kept.append([task, meeting_start - curr])
+        break
+    # 补足到23:00
+    curr = sum(x[1] for x in kept)
+    if curr < meeting_start:
+      kept.append(["preparing for the expert meeting", meeting_start - curr])
+    # 强制23:00移动任务（60分钟）
+    kept.append(["walking to meeting location at coordinates (139, 50)", 60])
+    n_m1_hourly_compressed = kept
+    print(f"✅ 专家 {persona.scratch.name} 强制23:00移动任务")
+  else:
+    # 普通agent：补足到24小时
+    if total_minutes < 1440:
+      n_m1_hourly_compressed.append(["sleeping", 1440 - total_minutes])
+      print(f"✅ {persona.scratch.name} 日程补足到24小时")
+  # ========== 日程完整性保证结束 ==========
 
   return n_m1_hourly_compressed
 

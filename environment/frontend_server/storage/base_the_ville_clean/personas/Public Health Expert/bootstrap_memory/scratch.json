@@ -4,7 +4,7 @@
   "retention": 8,
   "curr_time": null,
   "curr_tile": null,
-  "daily_plan_req": "Public Health Expert has flexible daily activities focused on health investigation - he may review medical data, conduct interviews with affected residents, visit various locations to assess health risks, or analyze symptoms and patterns. His schedule adapts to investigation needs and emerging health concerns. However, at 11:00pm (23:00) he MUST immediately cease all activities and walk directly toward the meeting location at coordinates (145, 50) for the expert consultation meeting. This 23:00 meeting attendance is absolutely mandatory and cannot be delayed.",
+  "daily_plan_req": "Public Health Expert reviews medical data, interviews residents, visits locations to assess health risks, analyzes symptoms of food poisoning.",
   "name": "Public Health Expert",
   "first_name": "Public Health",
   "last_name": "Expert",

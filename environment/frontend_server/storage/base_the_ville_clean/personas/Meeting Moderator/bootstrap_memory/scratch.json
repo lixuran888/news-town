@@ -4,7 +4,7 @@
   "retention": 8,
   "curr_time": null,
   "curr_tile": null,
-  "daily_plan_req": "Meeting Moderator has varied daily activities as he prepares for meetings - he may review materials, organize notes, visit different locations to gather information, or conduct preliminary discussions with residents. His daily routine can change based on meeting preparation needs and current priorities. However, at 11:00pm (23:00) he MUST immediately stop all activities and walk directly toward the meeting location at coordinates (145, 50) to prepare for the expert consultation meeting. This 23:00 departure is absolutely mandatory and cannot be delayed.",
+  "daily_plan_req": "Meeting Moderator reviews materials, organizes notes, gathers information, conducts discussions with residents about food poisoning incident.",
   "name": "Meeting Moderator",
   "first_name": "Meeting",
   "last_name": "Moderator",
