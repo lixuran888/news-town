@@ -10,17 +10,14 @@ import threading
 from pathlib import Path
 from datetime import datetime
 
-# 专家列表
-EXPERTS = [
-    "Education Bureau Representative",
-    "Meeting Moderator", 
-    "Public Health Expert",
-    "Market Supervision Expert"
-]
-
-# 目标位置 (地图最右边边缘)
-TARGET_X = 139  # 地图宽度140，最大x=139
-TARGET_Y = 50   # 地图高度100的中间点
+# 专家列表及各自的目标坐标（2x2区域，避免冲突）
+EXPERT_TARGETS = {
+    "Public Health Expert": (139, 49),
+    "Market Supervision Expert": (139, 50),
+    "Education Bureau Representative": (138, 49),
+    "Meeting Moderator": (138, 50)
+}
+EXPERTS = list(EXPERT_TARGETS.keys())
 POSITION_TOLERANCE = 3  # 位置容差
 
 # 监控配置
@@ -75,41 +72,49 @@ class ExpertPositionMonitor:
             
         return None
     
-    def is_at_target_position(self, position):
-        """检查是否到达目标位置"""
+    def is_at_target_position(self, position, expert_name=None):
+        """检查是否到达目标位置（每个专家有不同的目标）"""
         if not position:
             return False
-            
+        
         x, y = position
-        return (abs(x - TARGET_X) <= POSITION_TOLERANCE and 
-                abs(y - TARGET_Y) <= POSITION_TOLERANCE)
+        
+        # 如果指定了专家名，检查该专家的特定目标
+        if expert_name and expert_name in EXPERT_TARGETS:
+            target_x, target_y = EXPERT_TARGETS[expert_name]
+            return (abs(x - target_x) <= POSITION_TOLERANCE and 
+                    abs(y - target_y) <= POSITION_TOLERANCE)
+        
+        # 否则检查是否在任意一个目标位置附近（兼容旧调用）
+        for target_x, target_y in EXPERT_TARGETS.values():
+            if (abs(x - target_x) <= POSITION_TOLERANCE and 
+                abs(y - target_y) <= POSITION_TOLERANCE):
+                return True
+        return False
     
     def get_current_simulation_time(self):
         """获取当前模拟时间"""
         try:
-            # 从reverie.py或其他地方获取当前模拟时间
-            # 这里简化为检查文件修改时间
             return datetime.now().strftime("%H:%M")
         except:
             return "00:00"
     
-    # 不再需要时间检查，直接在reverie.py中控制
-    
     def check_all_experts_arrived(self, current_step):
-        """检查所有专家是否都到达目标位置"""
+        """检查所有专家是否都到达各自的目标位置"""
         arrived_count = 0
         
         for expert_name in EXPERTS:
             position = self.get_persona_position_from_movement(expert_name, current_step)
+            target = EXPERT_TARGETS.get(expert_name, (139, 50))
             
-            if self.is_at_target_position(position):
+            if self.is_at_target_position(position, expert_name):
                 if expert_name not in self.experts_arrived:
                     self.experts_arrived.add(expert_name)
-                    print(f"[Monitor] ✓ {expert_name} 已到达目标位置 {position}")
+                    print(f"[Monitor] ✓ {expert_name} 已到达目标位置 {position} (目标: {target})")
                 arrived_count += 1
             else:
                 if position:
-                    print(f"[Monitor] {expert_name} 当前位置: {position}, 目标: ({TARGET_X}, {TARGET_Y})")
+                    print(f"[Monitor] {expert_name} 当前位置: {position}, 目标: {target}")
                 else:
                     print(f"[Monitor] {expert_name} 位置未知")
         
@@ -127,7 +132,7 @@ class ExpertPositionMonitor:
         trigger_data = {
             "timestamp": datetime.now().isoformat(),
             "experts_arrived": list(self.experts_arrived),
-            "target_position": [TARGET_X, TARGET_Y],
+            "target_positions": {k: list(v) for k, v in EXPERT_TARGETS.items()},
             "action": "show_expert_conversation"
         }
         

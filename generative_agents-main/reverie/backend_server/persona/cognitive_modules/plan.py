@@ -103,43 +103,37 @@ def generate_hourly_schedule(persona, wake_up_hour):
   if debug: print ("GNS FUNCTION: <generate_hourly_schedule>")
 
   # ========== 分段生成策略：避免token截断 ==========
-  # 第一段：0-12点（上午）
-  hour_str_morning = ["00:00 AM", "01:00 AM", "02:00 AM", "03:00 AM", "04:00 AM", 
-                      "05:00 AM", "06:00 AM", "07:00 AM", "08:00 AM", "09:00 AM", 
-                      "10:00 AM", "11:00 AM"]
-  # 第二段：12-24点（下午）
-  hour_str_afternoon = ["12:00 PM", "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", 
-                        "05:00 PM", "06:00 PM", "07:00 PM", "08:00 PM", "09:00 PM",
-                        "10:00 PM", "11:00 PM"]
+  # 完整24小时时间表
+  hour_str_full = ["00:00 AM", "01:00 AM", "02:00 AM", "03:00 AM", "04:00 AM", 
+                   "05:00 AM", "06:00 AM", "07:00 AM", "08:00 AM", "09:00 AM", 
+                   "10:00 AM", "11:00 AM", "12:00 PM", "01:00 PM", "02:00 PM", 
+                   "03:00 PM", "04:00 PM", "05:00 PM", "06:00 PM", "07:00 PM", 
+                   "08:00 PM", "09:00 PM", "10:00 PM", "11:00 PM"]
   
-  morning_activity = []
-  afternoon_activity = []
+  n_m1_activity = []
   diversity_repeat_count = 3
   
-  # 第一段：生成上午日程 (0-12点)
+  # 分段生成：上午(0-12) + 下午(12-24)
   for i in range(diversity_repeat_count): 
-    if len(set(morning_activity)) < 5: 
-      morning_activity = []
+    if len(set(n_m1_activity)) < 5: 
+      n_m1_activity = []
       temp_wake = wake_up_hour
-      for curr_hour_str in hour_str_morning: 
+      
+      # 上午：0-12点
+      for curr_hour_str in hour_str_full[:12]: 
         if temp_wake > 0: 
-          morning_activity += ["sleeping"]
+          n_m1_activity += ["sleeping"]
           temp_wake -= 1
         else: 
-          morning_activity += [run_gpt_prompt_generate_hourly_schedule(
-                          persona, curr_hour_str, morning_activity, hour_str_morning)[0]]
+          n_m1_activity += [run_gpt_prompt_generate_hourly_schedule(
+                          persona, curr_hour_str, n_m1_activity, hour_str_full)[0]]
+      
+      # 下午：12-24点（传入完整hour_str_full，让LLM知道这是同一天的延续）
+      for curr_hour_str in hour_str_full[12:]: 
+        n_m1_activity += [run_gpt_prompt_generate_hourly_schedule(
+                        persona, curr_hour_str, n_m1_activity, hour_str_full)[0]]
   
-  # 第二段：生成下午日程 (12-24点)
-  for i in range(diversity_repeat_count): 
-    if len(set(afternoon_activity)) < 5: 
-      afternoon_activity = []
-      for curr_hour_str in hour_str_afternoon: 
-        afternoon_activity += [run_gpt_prompt_generate_hourly_schedule(
-                        persona, curr_hour_str, morning_activity + afternoon_activity, hour_str_afternoon)[0]]
-  
-  # 合并上午和下午日程
-  n_m1_activity = morning_activity + afternoon_activity
-  print(f"✅ {persona.scratch.name} 分段生成完成：上午{len(morning_activity)}项 + 下午{len(afternoon_activity)}项")
+  print(f"✅ {persona.scratch.name} 日程生成完成：共{len(n_m1_activity)}小时")
   
   # Step 1. Compressing the hourly schedule to the following format: 
   # The integer indicates the number of hours. They should add up to 24. 
@@ -169,13 +163,14 @@ def generate_hourly_schedule(persona, wake_up_hour):
     n_m1_hourly_compressed += [[task, duration*60]]
 
   # ========== 确保所有agent日程完整24小时 ==========
-  experts_and_moderator = [
-    "Public Health Expert",
-    "Market Supervision Expert", 
-    "Education Bureau Representative",
-    "Meeting Moderator"
-  ]
-  is_expert = persona.scratch.name in experts_and_moderator
+  # 每个专家的目标坐标（2x2区域，避免冲突）
+  expert_meeting_targets = {
+    "Public Health Expert": (139, 49),
+    "Market Supervision Expert": (139, 50),
+    "Education Bureau Representative": (138, 49),
+    "Meeting Moderator": (138, 50)
+  }
+  is_expert = persona.scratch.name in expert_meeting_targets
   total_minutes = sum(item[1] for item in n_m1_hourly_compressed)
 
   if is_expert:
@@ -195,10 +190,11 @@ def generate_hourly_schedule(persona, wake_up_hour):
     curr = sum(x[1] for x in kept)
     if curr < meeting_start:
       kept.append(["preparing for the expert meeting", meeting_start - curr])
-    # 强制23:00移动任务（60分钟）
-    kept.append(["walking to meeting location at coordinates (139, 50)", 60])
+    # 强制23:00移动任务（60分钟），使用该专家的目标坐标
+    target = expert_meeting_targets[persona.scratch.name]
+    kept.append([f"walking to meeting location at coordinates {target}", 60])
     n_m1_hourly_compressed = kept
-    print(f"✅ 专家 {persona.scratch.name} 强制23:00移动任务")
+    print(f"✅ 专家 {persona.scratch.name} 强制23:00移动任务 -> {target}")
   else:
     # 普通agent：补足到24小时
     if total_minutes < 1440:

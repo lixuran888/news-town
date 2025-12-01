@@ -35,6 +35,8 @@ from global_methods import *
 from utils import *
 from maze import *
 from persona.persona import *
+from path_finder import path_finder
+from utils import collision_block_id
 from expert_init import (
   inject_food_poisoning_event,
   generate_and_broadcast_public_opinion,
@@ -537,34 +539,91 @@ class ReverieServer:
               self.curr_time)
 
             # ========== 专家23:00强制移动到会议地点 ==========
-            # 停下一切工作（对话、睡觉等），立即移动到目标位置！
+            # 停下一切工作（对话、睡觉等），使用寻路系统移动到目标位置！
             experts_and_moderator = [
               "Public Health Expert",
               "Market Supervision Expert", 
               "Education Bureau Representative",
               "Meeting Moderator"
             ]
-            EXPERT_MEETING_TARGET = (139, 50)  # 地图最右边边缘
+            # 每个专家分配不同的目标坐标（2x2区域，避免冲突）
+            EXPERT_MEETING_TARGETS = {
+              "Public Health Expert": (139, 49),
+              "Market Supervision Expert": (139, 50),
+              "Education Bureau Representative": (138, 49),
+              "Meeting Moderator": (138, 50)
+            }
             
             if persona_name in experts_and_moderator and self.curr_time.hour >= 23:
               curr_pos = self.personas_tile[persona_name]
-              target = EXPERT_MEETING_TARGET
+              target = EXPERT_MEETING_TARGETS[persona_name]
               
-              # 如果还没到达目标位置，强制向目标移动
-              if curr_pos != target:
-                # 计算下一步移动位置（向目标方向移动一步）
-                dx = 1 if target[0] > curr_pos[0] else (-1 if target[0] < curr_pos[0] else 0)
-                dy = 1 if target[1] > curr_pos[1] else (-1 if target[1] < curr_pos[1] else 0)
-                next_tile = (curr_pos[0] + dx, curr_pos[1] + dy)
-                pronunciatio = "🚨"
-                description = f"URGENT: walking to expert meeting at {target}"
+              # 判断是否已到达目标（允许1格容差）
+              at_target = (abs(curr_pos[0] - target[0]) <= 1 and 
+                          abs(curr_pos[1] - target[1]) <= 1)
+              
+              # 检查是否已有指向目标的有效路径（避免每步重算）
+              # 情况1：planned_path 仍有元素且终点是目标
+              # 情况2：next_tile 已经是目标（路径刚好走完）
+              has_valid_path = ((persona.scratch.planned_path and 
+                                len(persona.scratch.planned_path) > 0 and
+                                persona.scratch.planned_path[-1] == target) or
+                               next_tile == target)
+              
+              # 如果还没到达目标位置，使用寻路系统强制移动
+              if not at_target:
+                # 强制停止对话！同时清空聊天对象的状态
+                if persona.scratch.chatting_with:
+                  chat_partner_name = persona.scratch.chatting_with
+                  if chat_partner_name in self.personas:
+                    partner = self.personas[chat_partner_name]
+                    partner.scratch.chat = None
+                    partner.scratch.chatting_with = None
+                    partner.scratch.chatting_end_time = None
+                    print(f"🔇 清空聊天对象 {chat_partner_name} 的对话状态")
                 
-                # 强制停止对话！
                 persona.scratch.chat = None
                 persona.scratch.chatting_with = None
                 persona.scratch.chatting_end_time = None
                 
-                print(f"🚨 强制移动: {persona_name} 从 {curr_pos} 向 {target}，下一步 {next_tile}")
+                # 只在没有有效路径时才重新计算（优化性能）
+                if not has_valid_path:
+                  # 使用path_finder计算路径（考虑障碍物）
+                  try:
+                    path = path_finder(self.maze.collision_maze, curr_pos, target, collision_block_id)
+                    
+                    if path and len(path) > 1:
+                      # 设置寻路路径
+                      persona.scratch.planned_path = path[1:]
+                      persona.scratch.act_path_set = True  # 防止下一步被覆盖！
+                      next_tile = path[1]
+                      print(f"🚨 强制寻路: {persona_name} 从 {curr_pos} 到 {target}，路径长度 {len(path)}")
+                    else:
+                      # 寻路失败，使用简单直线移动作为备用
+                      dx = 1 if target[0] > curr_pos[0] else (-1 if target[0] < curr_pos[0] else 0)
+                      dy = 1 if target[1] > curr_pos[1] else (-1 if target[1] < curr_pos[1] else 0)
+                      next_tile = (curr_pos[0] + dx, curr_pos[1] + dy)
+                      print(f"⚠️ 寻路失败，直线移动: {persona_name} {curr_pos} -> {next_tile}")
+                  except Exception as e:
+                    # 异常时使用简单移动
+                    dx = 1 if target[0] > curr_pos[0] else (-1 if target[0] < curr_pos[0] else 0)
+                    dy = 1 if target[1] > curr_pos[1] else (-1 if target[1] < curr_pos[1] else 0)
+                    next_tile = (curr_pos[0] + dx, curr_pos[1] + dy)
+                    print(f"⚠️ 寻路异常({e})，直线移动: {persona_name}")
+                else:
+                  # 已有有效路径，execute()已经取出了下一步，不需要再取
+                  # next_tile 已经由 persona.move() 返回，这里只需确保状态正确
+                  persona.scratch.act_path_set = True
+                  print(f"🚶 使用现有路径: {persona_name} -> {next_tile}")
+                
+                pronunciatio = "🚨"
+                description = f"URGENT: walking to expert meeting at {target}"
+              else:
+                # 已到达目标，标记为已到达
+                if EXPERT_MONITOR_AVAILABLE and self.expert_monitor:
+                  if persona_name not in self.expert_monitor.experts_arrived:
+                    self.expert_monitor.experts_arrived.add(persona_name)
+                    print(f"✅ {persona_name} 已到达会议地点 {curr_pos}")
             # ========== 专家强制移动结束 ==========
             
             # 检查专家是否已到达目标位置并应该隐藏
@@ -647,6 +706,15 @@ class ReverieServer:
             # 不让舆论模块的异常影响主循环
             pass
           
+          # 06:00 重置专家状态（会议结束，新的一天开始）
+          if self.curr_time.hour == 6 and self.curr_time.minute == 0:
+            if EXPERT_MONITOR_AVAILABLE and self.expert_monitor:
+              if self.expert_monitor.experts_arrived or self.expert_monitor.trigger_sent:
+                print(f"[Reverie] 06:00 重置专家会议状态")
+                self.expert_monitor.experts_arrived = set()
+                self.expert_monitor.trigger_sent = False
+                self.expert_monitor_started = False
+          
           # 检查专家位置监控触发
           try:
             if (EXPERT_MONITOR_AVAILABLE and self.expert_monitor and 
@@ -656,8 +724,8 @@ class ReverieServer:
                                 "Public Health Expert", "Market Supervision Expert"]:
                 expert_pos = self.personas_tile.get(expert_name)
                 
-                # 检查是否到达目标位置
-                if self.expert_monitor.is_at_target_position(expert_pos):
+                # 检查是否到达目标位置（传入expert_name检查各自的目标）
+                if self.expert_monitor.is_at_target_position(expert_pos, expert_name):
                   if expert_name not in self.expert_monitor.experts_arrived:
                     self.expert_monitor.experts_arrived.add(expert_name)
                     print(f"[Monitor] ✓ {expert_name} 已到达目标位置 {expert_pos}")
