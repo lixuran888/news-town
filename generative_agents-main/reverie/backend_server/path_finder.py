@@ -111,7 +111,8 @@ def path_finder_v2(a, start, end, collision_block_char, verbose=False):
   for row in a: 
     new_row = []
     for j in row:
-      if j == collision_block_char: 
+      # 修复：CSV 值可能带空格，需要 strip() 后比较
+      if str(j).strip() == str(collision_block_char).strip(): 
         new_row += [1]
       else: 
         new_row += [0]

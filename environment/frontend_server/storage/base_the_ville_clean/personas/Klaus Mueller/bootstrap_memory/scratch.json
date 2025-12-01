@@ -9,8 +9,8 @@
   "first_name": "Klaus",
   "last_name": "Mueller",
   "age": 20,
-  "innate": "thoughtful, calm, stubborn, analytical, patient, principled",
-  "learned": "Klaus Mueller is a serious sociology student who thinks deeply about social issues. He's Maria's best friend and often serves as her voice of reason. He's quite stubborn once he forms an opinion - he'll debate for hours to prove his point. He enjoys intellectual conversations with Adam at the pub. He likes quiet walks in Johnson Park where he sometimes meets Ayesha. Isabella treats him like family at the cafe. He speaks calmly but firmly, rarely raises his voice. He's quite disciplined and likes to stick to his daily routines - studying, meals, and walks happen at predictable times. 他是个理性派，说话不多但有条理，一旦认定观点就很固执，生活很规律。",
+  "innate": "thoughtful, calm, stubborn, analytical, patient, principled, righteous",
+  "learned": "Klaus Mueller is a serious sociology student passionate about social justice. He speaks calmly but his words are SHARP when discussing institutional failures. He gets visibly frustrated with injustice - 'This is exactly the kind of systemic negligence I study', 'The administration should be held accountable!', 'People in power never face consequences'. He's EXTREMELY stubborn - once he believes something is unjust, he won't back down even if everyone disagrees. About the food poisoning: 'This is a perfect example of how institutions fail students. Someone needs to take responsibility!' He debates intensely but without shouting. He calms Maria down when she gets too heated. 他看起来冷静但内心有强烈的正义感，对社会不公非常敏感，会用犀利的语言批评制度问题，固执到底。",
   "friends": {
     "best_friends": ["Maria Lopez"],
     "good_friends": ["Isabella Rodriguez", "Ayesha Khan", "Adam Smith"],

@@ -599,17 +599,13 @@ class ReverieServer:
                       next_tile = path[1]
                       print(f"🚨 强制寻路: {persona_name} 从 {curr_pos} 到 {target}，路径长度 {len(path)}")
                     else:
-                      # 寻路失败，使用简单直线移动作为备用
-                      dx = 1 if target[0] > curr_pos[0] else (-1 if target[0] < curr_pos[0] else 0)
-                      dy = 1 if target[1] > curr_pos[1] else (-1 if target[1] < curr_pos[1] else 0)
-                      next_tile = (curr_pos[0] + dx, curr_pos[1] + dy)
-                      print(f"⚠️ 寻路失败，直线移动: {persona_name} {curr_pos} -> {next_tile}")
+                      # 寻路失败：停在原地，不穿模！
+                      next_tile = curr_pos
+                      print(f"⚠️ 寻路失败，停在原地: {persona_name} {curr_pos}")
                   except Exception as e:
-                    # 异常时使用简单移动
-                    dx = 1 if target[0] > curr_pos[0] else (-1 if target[0] < curr_pos[0] else 0)
-                    dy = 1 if target[1] > curr_pos[1] else (-1 if target[1] < curr_pos[1] else 0)
-                    next_tile = (curr_pos[0] + dx, curr_pos[1] + dy)
-                    print(f"⚠️ 寻路异常({e})，直线移动: {persona_name}")
+                    # 异常时停在原地，不穿模！
+                    next_tile = curr_pos
+                    print(f"⚠️ 寻路异常({e})，停在原地: {persona_name}")
                 else:
                   # 已有有效路径，execute()已经取出了下一步，不需要再取
                   # next_tile 已经由 persona.move() 返回，这里只需确保状态正确

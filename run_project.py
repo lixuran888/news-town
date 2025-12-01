@@ -46,21 +46,45 @@ def start_django(frontend_dir: Path, port: int) -> subprocess.Popen:
     return subprocess.Popen(cmd, cwd=str(frontend_dir))
 
 
-def start_reverie(reverie_py: Path, reverie_dir: Path, origin: str, target: str, autorun_steps: int = 0) -> subprocess.Popen:
-    p = subprocess.Popen([sys.executable, str(reverie_py)], cwd=str(reverie_dir), stdin=subprocess.PIPE)
-    try:
-        # reverie.py expects two input lines: origin and target
-        init_input = f"{origin}\n{target}\n".encode("utf-8")
-        p.stdin.write(init_input)
-        p.stdin.flush()
-        # Optionally kick off steps automatically so no interactive typing is needed
-        if autorun_steps and autorun_steps > 0:
-            cmd = f"run {autorun_steps}\n".encode("utf-8")
-            p.stdin.write(cmd)
+def start_reverie(reverie_py: Path, reverie_dir: Path, origin: str, target: str, autorun_steps: int = 0, interactive: bool = False) -> subprocess.Popen:
+    """
+    启动 reverie.py 进程。
+    如果 interactive=True，在初始化后将 stdin 切换为用户终端输入（Windows 下需要特殊处理）。
+    否则使用 PIPE 模式，由程序控制输入。
+    """
+    if interactive:
+        # 交互模式：先用临时文件传递初始化参数，然后让用户直接输入
+        import tempfile
+        init_file = Path(tempfile.gettempdir()) / "reverie_init.txt"
+        init_file.write_text(f"{origin}\n{target}\n", encoding="utf-8")
+        
+        # 使用 stdin 从文件读取初始化，然后切换到终端
+        # Windows 下使用 cmd /c 来实现
+        if os.name == "nt":
+            cmd_str = f'type "{init_file}" | {sys.executable} "{reverie_py}"'
+            p = subprocess.Popen(cmd_str, cwd=str(reverie_dir), shell=True)
+        else:
+            p = subprocess.Popen(
+                f'cat "{init_file}" - | {sys.executable} "{reverie_py}"',
+                cwd=str(reverie_dir), shell=True
+            )
+        return p
+    else:
+        # PIPE 模式：由程序完全控制输入
+        p = subprocess.Popen([sys.executable, str(reverie_py)], cwd=str(reverie_dir), stdin=subprocess.PIPE)
+        try:
+            # reverie.py expects two input lines: origin and target
+            init_input = f"{origin}\n{target}\n".encode("utf-8")
+            p.stdin.write(init_input)
             p.stdin.flush()
-    except Exception:
-        pass
-    return p
+            # Optionally kick off steps automatically so no interactive typing is needed
+            if autorun_steps and autorun_steps > 0:
+                cmd = f"run {autorun_steps}\n".encode("utf-8")
+                p.stdin.write(cmd)
+                p.stdin.flush()
+        except Exception:
+            pass
+        return p
 
 
 def start_reverie_auto_tick(proc: subprocess.Popen, tick: int, interval: float):
@@ -90,6 +114,7 @@ def main():
     parser.add_argument("--autorun", type=int, default=0, help="Number of steps to auto-run once after starting Reverie. Set 0 to disable.")
     parser.add_argument("--tick", type=int, default=1, help="Auto-ticking: steps per tick. 0 to disable continuous ticking.")
     parser.add_argument("--interval", type=float, default=0.5, help="Auto-ticking interval seconds between ticks.")
+    parser.add_argument("--interactive", "-i", action="store_true", help="交互模式：允许用户在终端直接输入命令（如 run 100）")
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parent
@@ -125,12 +150,19 @@ def main():
     django_proc = start_django(frontend_dir, args.port)
 
     print(f"[3/3] 启动 Reverie 后端，origin='{origin}', target='{target}' ...")
-    reverie_proc = start_reverie(reverie_py, reverie_dir, origin, target, args.autorun)
-    if args.tick > 0 and args.interval > 0:
-        print(f"[AutoTick] 每 {args.interval}s 推进 {args.tick} 步（可用 stop_project.bat 停止）")
-        start_reverie_auto_tick(reverie_proc, args.tick, args.interval)
-
-    print("已启动。按 Ctrl+C 结束所有进程。")
+    
+    if args.interactive:
+        # 交互模式：用户可以直接在终端输入命令
+        print("[交互模式] 启动后你可以在终端输入命令，如: run 100")
+        reverie_proc = start_reverie(reverie_py, reverie_dir, origin, target, args.autorun, interactive=True)
+        print("已启动。在 Reverie 终端输入 'run <步数>' 推进模拟，或按 Ctrl+C 结束。")
+    else:
+        # 自动模式：由程序控制
+        reverie_proc = start_reverie(reverie_py, reverie_dir, origin, target, args.autorun, interactive=False)
+        if args.tick > 0 and args.interval > 0:
+            print(f"[AutoTick] 每 {args.interval}s 推进 {args.tick} 步（可用 stop_project.bat 停止）")
+            start_reverie_auto_tick(reverie_proc, args.tick, args.interval)
+        print("已启动。按 Ctrl+C 结束所有进程。")
 
     try:
         # Wait until one of the processes exits
