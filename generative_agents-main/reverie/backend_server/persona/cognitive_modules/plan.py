@@ -163,14 +163,17 @@ def generate_hourly_schedule(persona, wake_up_hour):
     n_m1_hourly_compressed += [[task, duration*60]]
 
   # ========== 确保所有agent日程完整24小时 ==========
-  # 每个专家的目标坐标（2x2区域，避免冲突）
-  expert_meeting_targets = {
-    "Public Health Expert": (139, 49),
-    "Market Supervision Expert": (139, 50),
-    "Education Bureau Representative": (138, 49),
-    "Meeting Moderator": (138, 50)
-  }
-  is_expert = persona.scratch.name in expert_meeting_targets
+  # 专家列表
+  experts_list = [
+    "Public Health Expert",
+    "Market Supervision Expert",
+    "Education Bureau Representative",
+    "Meeting Moderator"
+  ]
+  # 会议地点（使用地图上的命名地点，确保可达）
+  MEETING_LOCATION = "the Ville:Dorm for Oak Hill College:common room"
+  
+  is_expert = persona.scratch.name in experts_list
   total_minutes = sum(item[1] for item in n_m1_hourly_compressed)
 
   if is_expert:
@@ -190,11 +193,10 @@ def generate_hourly_schedule(persona, wake_up_hour):
     curr = sum(x[1] for x in kept)
     if curr < meeting_start:
       kept.append(["preparing for the expert meeting", meeting_start - curr])
-    # 强制23:00移动任务（60分钟），使用该专家的目标坐标
-    target = expert_meeting_targets[persona.scratch.name]
-    kept.append([f"walking to meeting location at coordinates {target}", 60])
+    # 强制23:00移动任务（60分钟），使用地点名称
+    kept.append([f"{MEETING_LOCATION}:<random>", 60])
     n_m1_hourly_compressed = kept
-    print(f"✅ 专家 {persona.scratch.name} 强制23:00移动任务 -> {target}")
+    print(f"[Plan] Expert {persona.scratch.name} -> {MEETING_LOCATION}")
   else:
     # 普通agent：补足到24小时
     if total_minutes < 1440:

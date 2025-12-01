@@ -416,7 +416,8 @@ def expert_meeting_trigger(request):
   当所有专家到达指定位置时，后端会创建触发文件，前端通过此API获取
   """
   try:
-    trigger_file_path = Path("expert_meeting_trigger.flag")
+    # 使用绝对路径，确保能找到 Reverie 创建的触发文件
+    trigger_file_path = Path(__file__).parent.parent / "expert_meeting_trigger.flag"
     
     if trigger_file_path.exists():
       with open(trigger_file_path, 'r', encoding='utf-8') as f:

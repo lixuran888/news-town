@@ -10,20 +10,22 @@ import threading
 from pathlib import Path
 from datetime import datetime
 
-# 专家列表及各自的目标坐标（2x2区域，避免冲突）
-EXPERT_TARGETS = {
-    "Public Health Expert": (139, 49),
-    "Market Supervision Expert": (139, 50),
-    "Education Bureau Representative": (138, 49),
-    "Meeting Moderator": (138, 50)
-}
-EXPERTS = list(EXPERT_TARGETS.keys())
-POSITION_TOLERANCE = 3  # 位置容差
+# 专家列表
+EXPERTS = [
+    "Public Health Expert",
+    "Market Supervision Expert",
+    "Education Bureau Representative",
+    "Meeting Moderator"
+]
+# 会议地点：Dorm common room 的可达中心位置
+MEETING_CENTER = (120, 49)  # 修正为可达坐标
+POSITION_TOLERANCE = 5  # 位置容差（同一区域内即可）
 
 # 监控配置
 MONITOR_START_TIME = "23:00"  # 开始监控时间
 CHECK_INTERVAL = 5  # 检查间隔(秒)
-TRIGGER_FILE = "expert_meeting_trigger.flag"  # 触发文件
+# 使用绝对路径，确保 Django 和 Reverie 都能访问同一文件
+TRIGGER_FILE = Path(__file__).parent.parent.parent / "environment" / "frontend_server" / "expert_meeting_trigger.flag"
 
 class ExpertPositionMonitor:
     def __init__(self, simulation_dir):
@@ -73,24 +75,16 @@ class ExpertPositionMonitor:
         return None
     
     def is_at_target_position(self, position, expert_name=None):
-        """检查是否到达目标位置（每个专家有不同的目标）"""
+        """检查是否到达会议地点（Dorm common room 区域）"""
         if not position:
             return False
         
         x, y = position
+        target_x, target_y = MEETING_CENTER
         
-        # 如果指定了专家名，检查该专家的特定目标
-        if expert_name and expert_name in EXPERT_TARGETS:
-            target_x, target_y = EXPERT_TARGETS[expert_name]
-            return (abs(x - target_x) <= POSITION_TOLERANCE and 
-                    abs(y - target_y) <= POSITION_TOLERANCE)
-        
-        # 否则检查是否在任意一个目标位置附近（兼容旧调用）
-        for target_x, target_y in EXPERT_TARGETS.values():
-            if (abs(x - target_x) <= POSITION_TOLERANCE and 
-                abs(y - target_y) <= POSITION_TOLERANCE):
-                return True
-        return False
+        # 检查是否在会议地点附近
+        return (abs(x - target_x) <= POSITION_TOLERANCE and 
+                abs(y - target_y) <= POSITION_TOLERANCE)
     
     def get_current_simulation_time(self):
         """获取当前模拟时间"""

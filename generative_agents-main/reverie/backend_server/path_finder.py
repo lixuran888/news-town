@@ -93,73 +93,63 @@ def path_finder_v1(maze, start, end, collision_block_char, verbose=False):
   return path
 
 
-def path_finder_v2(a, start, end, collision_block_char, verbose=False):
-  def make_step(m, k):
-    for i in range(len(m)):
-      for j in range(len(m[i])):
-        if m[i][j] == k:
-          if i>0 and m[i-1][j] == 0 and a[i-1][j] == 0:
-            m[i-1][j] = k + 1
-          if j>0 and m[i][j-1] == 0 and a[i][j-1] == 0:
-            m[i][j-1] = k + 1
-          if i<len(m)-1 and m[i+1][j] == 0 and a[i+1][j] == 0:
-            m[i+1][j] = k + 1
-          if j<len(m[i])-1 and m[i][j+1] == 0 and a[i][j+1] == 0:
-             m[i][j+1] = k + 1
-
-  new_maze = []
-  for row in a: 
-    new_row = []
-    for j in row:
-      # 修复：CSV 值可能带空格，需要 strip() 后比较
-      if str(j).strip() == str(collision_block_char).strip(): 
-        new_row += [1]
-      else: 
-        new_row += [0]
-    new_maze += [new_row]
-  a = new_maze
-
-  m = []
-  for i in range(len(a)):
-      m.append([])
-      for j in range(len(a[i])):
-          m[-1].append(0)
-  i,j = start
-  m[i][j] = 1 
-
-  k = 0
-  except_handle = 150
-  while m[end[0]][end[1]] == 0:
-      k += 1
-      make_step(m, k)
-
-      if except_handle == 0: 
-        break
-      except_handle -= 1 
-
-  i, j = end
-  k = m[i][j]
-  the_path = [(i,j)]
-  while k > 1:
-    if i > 0 and m[i - 1][j] == k-1:
-      i, j = i-1, j
-      the_path.append((i, j))
-      k-=1
-    elif j > 0 and m[i][j - 1] == k-1:
-      i, j = i, j-1
-      the_path.append((i, j))
-      k-=1
-    elif i < len(m) - 1 and m[i + 1][j] == k-1:
-      i, j = i+1, j
-      the_path.append((i, j))
-      k-=1
-    elif j < len(m[i]) - 1 and m[i][j + 1] == k-1:
-      i, j = i, j+1
-      the_path.append((i, j))
-      k -= 1
-        
-  the_path.reverse()
-  return the_path
+def path_finder_v2(maze_input, start, end, collision_block_char, verbose=False):
+  """高效BFS寻路算法（使用队列）"""
+  from collections import deque
+  
+  # 处理迷宫，转换为 0/1 数组
+  rows = len(maze_input)
+  cols = len(maze_input[0]) if rows > 0 else 0
+  
+  # 创建障碍物矩阵
+  blocked = [[False] * cols for _ in range(rows)]
+  for i in range(rows):
+    for j in range(cols):
+      if str(maze_input[i][j]).strip() == str(collision_block_char).strip():
+        blocked[i][j] = True
+  
+  # 检查起点和终点是否有效
+  if blocked[start[0]][start[1]] or blocked[end[0]][end[1]]:
+    return [end]  # 起点或终点被阻塞
+  
+  # BFS使用队列
+  visited = [[False] * cols for _ in range(rows)]
+  parent = [[None] * cols for _ in range(rows)]
+  
+  queue = deque([start])
+  visited[start[0]][start[1]] = True
+  
+  directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # 上下左右
+  
+  found = False
+  while queue:
+    curr = queue.popleft()
+    
+    if curr == end:
+      found = True
+      break
+    
+    for di, dj in directions:
+      ni, nj = curr[0] + di, curr[1] + dj
+      if 0 <= ni < rows and 0 <= nj < cols:
+        if not visited[ni][nj] and not blocked[ni][nj]:
+          visited[ni][nj] = True
+          parent[ni][nj] = curr
+          queue.append((ni, nj))
+  
+  if not found:
+    print(f"[path_finder] unreachable! start={start}, end={end}")
+    return [end]
+  
+  # 回溯路径
+  path = []
+  curr = end
+  while curr is not None:
+    path.append(curr)
+    curr = parent[curr[0]][curr[1]]
+  
+  path.reverse()
+  return path
 
 
 def path_finder(maze, start, end, collision_block_char, verbose=False):

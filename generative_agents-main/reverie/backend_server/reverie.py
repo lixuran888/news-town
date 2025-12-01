@@ -546,29 +546,36 @@ class ReverieServer:
               "Education Bureau Representative",
               "Meeting Moderator"
             ]
-            # 每个专家分配不同的目标坐标（2x2区域，避免冲突）
-            EXPERT_MEETING_TARGETS = {
-              "Public Health Expert": (139, 49),
-              "Market Supervision Expert": (139, 50),
-              "Education Bureau Representative": (138, 49),
-              "Meeting Moderator": (138, 50)
-            }
+            # 使用地图上的命名地点作为目标（确保可达）
+            EXPERT_MEETING_LOCATION = "the Ville:Dorm for Oak Hill College:common room"
             
             if persona_name in experts_and_moderator and self.curr_time.hour >= 23:
               curr_pos = self.personas_tile[persona_name]
-              target = EXPERT_MEETING_TARGETS[persona_name]
               
-              # 判断是否已到达目标（允许1格容差）
-              at_target = (abs(curr_pos[0] - target[0]) <= 1 and 
-                          abs(curr_pos[1] - target[1]) <= 1)
+              # 从地点获取目标坐标（每个专家选不同的格子避免重叠）
+              if EXPERT_MEETING_LOCATION in self.maze.address_tiles:
+                meeting_tiles = list(self.maze.address_tiles[EXPERT_MEETING_LOCATION])
+                # 过滤掉被阻塞的格子
+                valid_tiles = []
+                for tile in meeting_tiles:
+                  if self.maze.collision_maze[tile[1]][tile[0]].strip() == "0":
+                    valid_tiles.append(tile)
+                if valid_tiles:
+                  expert_index = experts_and_moderator.index(persona_name)
+                  target = valid_tiles[expert_index % len(valid_tiles)]
+                else:
+                  target = (120, 49)  # 备用
+              else:
+                # 备用坐标（可达）
+                target = (120, 49)
               
-              # 检查是否已有指向目标的有效路径（避免每步重算）
-              # 情况1：planned_path 仍有元素且终点是目标
-              # 情况2：next_tile 已经是目标（路径刚好走完）
-              has_valid_path = ((persona.scratch.planned_path and 
-                                len(persona.scratch.planned_path) > 0 and
-                                persona.scratch.planned_path[-1] == target) or
-                               next_tile == target)
+              # 判断是否已到达目标（允许3格容差，因为是同一区域）
+              at_target = (abs(curr_pos[0] - target[0]) <= 3 and 
+                          abs(curr_pos[1] - target[1]) <= 3)
+              
+              # 检查是否已有有效路径
+              has_valid_path = (persona.scratch.planned_path and 
+                               len(persona.scratch.planned_path) > 0)
               
               # 如果还没到达目标位置，使用寻路系统强制移动
               if not at_target:
@@ -599,13 +606,21 @@ class ReverieServer:
                       next_tile = path[1]
                       print(f"🚨 强制寻路: {persona_name} 从 {curr_pos} 到 {target}，路径长度 {len(path)}")
                     else:
-                      # 寻路失败：停在原地，不穿模！
-                      next_tile = curr_pos
-                      print(f"⚠️ 寻路失败，停在原地: {persona_name} {curr_pos}")
+                      # 寻路失败：尝试直线移动（检查碰撞）
+                      dx = 1 if target[0] > curr_pos[0] else (-1 if target[0] < curr_pos[0] else 0)
+                      dy = 1 if target[1] > curr_pos[1] else (-1 if target[1] < curr_pos[1] else 0)
+                      candidate = (curr_pos[0] + dx, curr_pos[1] + dy)
+                      # 检查候选格子是否可走
+                      if self.maze.collision_maze[candidate[1]][candidate[0]].strip() == "0":
+                        next_tile = candidate
+                        print(f"[Expert] pathfind failed, linear move: {persona_name} {curr_pos} -> {next_tile}")
+                      else:
+                        next_tile = curr_pos  # 阻塞则停在原地
+                        print(f"[Expert] pathfind failed, blocked, stay: {persona_name} {curr_pos}")
                   except Exception as e:
-                    # 异常时停在原地，不穿模！
+                    # 异常时停在原地
                     next_tile = curr_pos
-                    print(f"⚠️ 寻路异常({e})，停在原地: {persona_name}")
+                    print(f"[Expert] pathfind error, stay: {persona_name}")
                 else:
                   # 已有有效路径，execute()已经取出了下一步，不需要再取
                   # next_tile 已经由 persona.move() 返回，这里只需确保状态正确
@@ -711,27 +726,17 @@ class ReverieServer:
                 self.expert_monitor.trigger_sent = False
                 self.expert_monitor_started = False
           
-          # 检查专家位置监控触发
+          # 检测所有专家到达后触发弹窗
           try:
             if (EXPERT_MONITOR_AVAILABLE and self.expert_monitor and 
-                self.expert_monitor_started and not self.expert_monitor.trigger_sent):
-              # 直接从内存中的位置数据获取专家位置
-              for expert_name in ["Education Bureau Representative", "Meeting Moderator", 
-                                "Public Health Expert", "Market Supervision Expert"]:
-                expert_pos = self.personas_tile.get(expert_name)
-                
-                # 检查是否到达目标位置（传入expert_name检查各自的目标）
-                if self.expert_monitor.is_at_target_position(expert_pos, expert_name):
-                  if expert_name not in self.expert_monitor.experts_arrived:
-                    self.expert_monitor.experts_arrived.add(expert_name)
-                    print(f"[Monitor] ✓ {expert_name} 已到达目标位置 {expert_pos}")
-              
-              # 检查是否所有专家都到达
-              if len(self.expert_monitor.experts_arrived) == 4:
+                not self.expert_monitor.trigger_sent):
+              # 检查是否所有4个专家都已到达
+              if len(self.expert_monitor.experts_arrived) >= 4:
+                print(f"[Reverie] ✅ 所有专家已到达，触发专家会议弹窗!")
                 self.expert_monitor.trigger_expert_meeting()
                 
           except Exception as e:
-            print(f"[Reverie] 专家位置监控异常: {e}")
+            print(f"[Reverie] 专家触发异常: {e}")
             pass
 
           int_counter -= 1
