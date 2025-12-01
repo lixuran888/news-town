@@ -1,0 +1,28 @@
+{
+  "timestamp": "2025-12-01T22:04:02.101051",
+  "experts_arrived": [
+    "Market Supervision Expert",
+    "Meeting Moderator",
+    "Public Health Expert",
+    "Education Bureau Representative"
+  ],
+  "target_positions": {
+    "Public Health Expert": [
+      118,
+      46
+    ],
+    "Market Supervision Expert": [
+      116,
+      52
+    ],
+    "Education Bureau Representative": [
+      118,
+      49
+    ],
+    "Meeting Moderator": [
+      122,
+      46
+    ]
+  },
+  "action": "show_expert_conversation"
+}

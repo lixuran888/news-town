@@ -20,6 +20,13 @@ EXPERTS = [
 # 会议地点：Dorm common room 的可达中心位置
 MEETING_CENTER = (120, 49)  # 修正为可达坐标
 POSITION_TOLERANCE = 5  # 位置容差（同一区域内即可）
+# 专家目标位置（备用）
+EXPERT_TARGETS = {
+    "Public Health Expert": (118, 46),
+    "Market Supervision Expert": (116, 52),
+    "Education Bureau Representative": (118, 49),
+    "Meeting Moderator": (122, 46)
+}
 
 # 监控配置
 MONITOR_START_TIME = "23:00"  # 开始监控时间
@@ -70,7 +77,7 @@ class ExpertPositionMonitor:
                     return (movement[0], movement[1])
                 
         except Exception as e:
-            print(f"[Monitor] 从movement文件获取 {persona_name} 位置失败: {e}")
+            print(f"[Monitor] Failed to get {persona_name} position: {e}")
             
         return None
     
@@ -104,13 +111,13 @@ class ExpertPositionMonitor:
             if self.is_at_target_position(position, expert_name):
                 if expert_name not in self.experts_arrived:
                     self.experts_arrived.add(expert_name)
-                    print(f"[Monitor] ✓ {expert_name} 已到达目标位置 {position} (目标: {target})")
+                    print(f"[Monitor] {expert_name} arrived at {position} (target: {target})")
                 arrived_count += 1
             else:
                 if position:
-                    print(f"[Monitor] {expert_name} 当前位置: {position}, 目标: {target}")
+                    print(f"[Monitor] {expert_name} at {position}, target: {target}")
                 else:
-                    print(f"[Monitor] {expert_name} 位置未知")
+                    print(f"[Monitor] {expert_name} position unknown")
         
         return arrived_count == len(EXPERTS)
     
@@ -119,7 +126,7 @@ class ExpertPositionMonitor:
         if self.trigger_sent:
             return
             
-        print(f"\n[Monitor] 🎉 所有专家已到达目标位置！触发专家会议界面...")
+        print(f"\n[Monitor] All experts arrived! Triggering expert meeting UI...")
         
         # 创建触发文件
         trigger_path = Path(TRIGGER_FILE)
@@ -137,7 +144,7 @@ class ExpertPositionMonitor:
         self.show_expert_conversation_ui()
         
         self.trigger_sent = True
-        print(f"[Monitor] 触发文件已创建: {trigger_path}")
+        print(f"[Monitor] Trigger file created: {trigger_path}")
     
     def show_expert_conversation_ui(self):
         """在界面右上角显示专家对话"""
@@ -171,24 +178,24 @@ class ExpertPositionMonitor:
             with open(js_file, 'w', encoding='utf-8') as f:
                 f.write(js_code)
                 
-            print(f"[Monitor] JavaScript触发文件已创建: {js_file}")
+            print(f"[Monitor] JS trigger file created: {js_file}")
             
         except Exception as e:
-            print(f"[Monitor] 显示专家对话界面失败: {e}")
+            print(f"[Monitor] Failed to show expert dialog: {e}")
     
     # 不再需要独立的监控循环，直接在reverie.py主循环中检查
     
     def start_monitoring(self):
         """启动监控（简化版，不再需要独立线程）"""
         self.monitoring = True
-        print(f"[Monitor] 专家位置监控已启动（集成到主循环）")
+        print(f"[Monitor] Expert position monitoring started")
     
     def stop_monitoring(self):
         """停止监控"""
         self.monitoring = False
         if hasattr(self, 'monitor_thread'):
             self.monitor_thread.join(timeout=5)
-        print(f"[Monitor] 专家位置监控已停止")
+        print(f"[Monitor] Expert position monitoring stopped")
 
 
 def main():
@@ -198,10 +205,10 @@ def main():
     latest_sim = monitor.get_latest_simulation_dir()
     
     if not latest_sim:
-        print("[Monitor] 未找到模拟目录")
+        print("[Monitor] Simulation directory not found")
         return
         
-    print(f"[Monitor] 使用模拟目录: {latest_sim}")
+    print(f"[Monitor] Using simulation dir: {latest_sim}")
     monitor.simulation_dir = latest_sim
     
     try:

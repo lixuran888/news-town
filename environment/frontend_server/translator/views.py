@@ -384,9 +384,15 @@ def update_environment(request):
 
   response_data = {"<step>": -1}
   if (check_if_file_exists(f"storage/{sim_code}/movement/{step}.json")):
-    with open(f"storage/{sim_code}/movement/{step}.json") as json_file: 
-      response_data = json.load(json_file)
-      response_data["<step>"] = step
+    try:
+      with open(f"storage/{sim_code}/movement/{step}.json", encoding='utf-8') as json_file: 
+        content = json_file.read()
+        if content.strip():  # 确保文件不为空
+          response_data = json.loads(content)
+          response_data["<step>"] = step
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+      print(f"[views.py] Error reading movement/{step}.json: {e}")
+      response_data = {"<step>": -1}
 
   return JsonResponse(response_data)
 

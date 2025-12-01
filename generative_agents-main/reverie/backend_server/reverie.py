@@ -237,6 +237,20 @@ class ReverieServer:
       s.act_path_set = False
       s.planned_path = []
 
+      # Fork 时清空旧的对话记忆，避免继承之前运行的聊天记录
+      # 只保留 event 和 thought，删除 chat 类型的记忆
+      if hasattr(curr_persona, 'a_mem') and curr_persona.a_mem:
+        old_chat_count = 0
+        nodes_to_remove = []
+        for node_id, node in curr_persona.a_mem.id_to_node.items():
+          if node.type == "chat":
+            nodes_to_remove.append(node_id)
+            old_chat_count += 1
+        for node_id in nodes_to_remove:
+          del curr_persona.a_mem.id_to_node[node_id]
+        if old_chat_count > 0:
+          print(f"[Fork] Cleared {old_chat_count} old chat memories from {persona_name}")
+
       # 在初始化时为每个 persona 注入一次校园食物中毒事件的长期记忆
       inject_food_poisoning_event(curr_persona, self.curr_time)
 
@@ -665,9 +679,15 @@ class ReverieServer:
           #  "persona": {"Klaus Mueller": {"movement": [38, 12]}}, 
           #  "meta": {curr_time: <datetime>}}
           curr_move_file = f"{sim_folder}/movement/{self.step}.json"
+          temp_move_file = f"{sim_folder}/movement/{self.step}.json.tmp"
           try:
-            with open(curr_move_file, "w") as outfile: 
+            # 原子写入：先写临时文件，再重命名，避免读取到空文件
+            with open(temp_move_file, "w", encoding='utf-8') as outfile: 
               outfile.write(json.dumps(movements, indent=2))
+            # 重命名是原子操作
+            if os.path.exists(curr_move_file):
+              os.remove(curr_move_file)
+            os.rename(temp_move_file, curr_move_file)
             if debug:
               print(f"[DEBUG] Wrote movement file: {curr_move_file}")
           except Exception as e:
