@@ -114,12 +114,23 @@ class ReverieServer:
     reverie_meta["fork_sim_code"] = fork_sim_code
     reverie_meta["step"] = 0
 
-    # 约定：只要是从 base_the_ville_clean fork 出来的世界线，
-    # 第一日的 curr_time 一律从晚上 22:40:00 开始。后续仍按
-    # sec_per_step 正常推进 24 小时，不受影响。
-    if reverie_meta.get("fork_sim_code") == "base_the_ville_clean":
-      date_str = reverie_meta.get("start_date", "February 13, 2023")
-      reverie_meta["curr_time"] = f"{date_str}, 22:40:00"
+    # 设置初始时间：如果 meta.json 中已有手动设置的 curr_time（非空），则保留它；
+    # 否则，如果是从 base_the_ville_clean fork 出来的世界线，默认从 00:00:00 开始。
+    # 这样前端在 landing 页面设置的时间会被保留，不会被覆盖。
+    # 注意：这里检查的是复制过来的 meta.json 中的 curr_time，如果前端已经设置过，应该已经存在。
+    existing_curr_time = reverie_meta.get("curr_time", "").strip()
+    if not existing_curr_time:
+      # 只有在 curr_time 不存在或为空时，才设置默认值
+      if fork_sim_code == "base_the_ville_clean":
+        date_str = reverie_meta.get("start_date", "February 13, 2023")
+        reverie_meta["curr_time"] = f"{date_str}, 00:00:00"
+      # 如果 fork_sim_code 不是 base_the_ville_clean，且没有 curr_time，则从 start_date 的 00:00:00 开始
+      elif "start_date" in reverie_meta:
+        date_str = reverie_meta.get("start_date", "February 13, 2023")
+        reverie_meta["curr_time"] = f"{date_str}, 00:00:00"
+    else:
+      # 如果已有 curr_time，保留它（前端设置的时间会被保留）
+      print(f"[Reverie] 保留已设置的初始时间: {existing_curr_time}")
 
     with open(f"{sim_folder}/reverie/meta.json", "w") as outfile: 
       outfile.write(json.dumps(reverie_meta, indent=2))
@@ -236,20 +247,6 @@ class ReverieServer:
 
       s.act_path_set = False
       s.planned_path = []
-
-      # Fork 时清空旧的对话记忆，避免继承之前运行的聊天记录
-      # 只保留 event 和 thought，删除 chat 类型的记忆
-      if hasattr(curr_persona, 'a_mem') and curr_persona.a_mem:
-        old_chat_count = 0
-        nodes_to_remove = []
-        for node_id, node in curr_persona.a_mem.id_to_node.items():
-          if node.type == "chat":
-            nodes_to_remove.append(node_id)
-            old_chat_count += 1
-        for node_id in nodes_to_remove:
-          del curr_persona.a_mem.id_to_node[node_id]
-        if old_chat_count > 0:
-          print(f"[Fork] Cleared {old_chat_count} old chat memories from {persona_name}")
 
       # 在初始化时为每个 persona 注入一次校园食物中毒事件的长期记忆
       inject_food_poisoning_event(curr_persona, self.curr_time)
@@ -560,36 +557,29 @@ class ReverieServer:
               "Education Bureau Representative",
               "Meeting Moderator"
             ]
-            # 使用地图上的命名地点作为目标（确保可达）
-            EXPERT_MEETING_LOCATION = "the Ville:Dorm for Oak Hill College:common room"
+            # 每个专家分配不同的目标坐标（2x2区域，避免冲突）
+            EXPERT_MEETING_TARGETS = {
+              "Public Health Expert": (139, 49),
+              "Market Supervision Expert": (139, 50),
+              "Education Bureau Representative": (138, 49),
+              "Meeting Moderator": (138, 50)
+            }
             
             if persona_name in experts_and_moderator and self.curr_time.hour >= 23:
               curr_pos = self.personas_tile[persona_name]
+              target = EXPERT_MEETING_TARGETS[persona_name]
               
-              # 从地点获取目标坐标（每个专家选不同的格子避免重叠）
-              if EXPERT_MEETING_LOCATION in self.maze.address_tiles:
-                meeting_tiles = list(self.maze.address_tiles[EXPERT_MEETING_LOCATION])
-                # 过滤掉被阻塞的格子
-                valid_tiles = []
-                for tile in meeting_tiles:
-                  if self.maze.collision_maze[tile[1]][tile[0]].strip() == "0":
-                    valid_tiles.append(tile)
-                if valid_tiles:
-                  expert_index = experts_and_moderator.index(persona_name)
-                  target = valid_tiles[expert_index % len(valid_tiles)]
-                else:
-                  target = (120, 49)  # 备用
-              else:
-                # 备用坐标（可达）
-                target = (120, 49)
+              # 判断是否已到达目标（允许1格容差）
+              at_target = (abs(curr_pos[0] - target[0]) <= 1 and 
+                          abs(curr_pos[1] - target[1]) <= 1)
               
-              # 判断是否已到达目标（允许3格容差，因为是同一区域）
-              at_target = (abs(curr_pos[0] - target[0]) <= 3 and 
-                          abs(curr_pos[1] - target[1]) <= 3)
-              
-              # 检查是否已有有效路径
-              has_valid_path = (persona.scratch.planned_path and 
-                               len(persona.scratch.planned_path) > 0)
+              # 检查是否已有指向目标的有效路径（避免每步重算）
+              # 情况1：planned_path 仍有元素且终点是目标
+              # 情况2：next_tile 已经是目标（路径刚好走完）
+              has_valid_path = ((persona.scratch.planned_path and 
+                                len(persona.scratch.planned_path) > 0 and
+                                persona.scratch.planned_path[-1] == target) or
+                               next_tile == target)
               
               # 如果还没到达目标位置，使用寻路系统强制移动
               if not at_target:
@@ -620,21 +610,17 @@ class ReverieServer:
                       next_tile = path[1]
                       print(f"🚨 强制寻路: {persona_name} 从 {curr_pos} 到 {target}，路径长度 {len(path)}")
                     else:
-                      # 寻路失败：尝试直线移动（检查碰撞）
+                      # 寻路失败，使用简单直线移动作为备用
                       dx = 1 if target[0] > curr_pos[0] else (-1 if target[0] < curr_pos[0] else 0)
                       dy = 1 if target[1] > curr_pos[1] else (-1 if target[1] < curr_pos[1] else 0)
-                      candidate = (curr_pos[0] + dx, curr_pos[1] + dy)
-                      # 检查候选格子是否可走
-                      if self.maze.collision_maze[candidate[1]][candidate[0]].strip() == "0":
-                        next_tile = candidate
-                        print(f"[Expert] pathfind failed, linear move: {persona_name} {curr_pos} -> {next_tile}")
-                      else:
-                        next_tile = curr_pos  # 阻塞则停在原地
-                        print(f"[Expert] pathfind failed, blocked, stay: {persona_name} {curr_pos}")
+                      next_tile = (curr_pos[0] + dx, curr_pos[1] + dy)
+                      print(f"⚠️ 寻路失败，直线移动: {persona_name} {curr_pos} -> {next_tile}")
                   except Exception as e:
-                    # 异常时停在原地
-                    next_tile = curr_pos
-                    print(f"[Expert] pathfind error, stay: {persona_name}")
+                    # 异常时使用简单移动
+                    dx = 1 if target[0] > curr_pos[0] else (-1 if target[0] < curr_pos[0] else 0)
+                    dy = 1 if target[1] > curr_pos[1] else (-1 if target[1] < curr_pos[1] else 0)
+                    next_tile = (curr_pos[0] + dx, curr_pos[1] + dy)
+                    print(f"⚠️ 寻路异常({e})，直线移动: {persona_name}")
                 else:
                   # 已有有效路径，execute()已经取出了下一步，不需要再取
                   # next_tile 已经由 persona.move() 返回，这里只需确保状态正确
@@ -679,15 +665,9 @@ class ReverieServer:
           #  "persona": {"Klaus Mueller": {"movement": [38, 12]}}, 
           #  "meta": {curr_time: <datetime>}}
           curr_move_file = f"{sim_folder}/movement/{self.step}.json"
-          temp_move_file = f"{sim_folder}/movement/{self.step}.json.tmp"
           try:
-            # 原子写入：先写临时文件，再重命名，避免读取到空文件
-            with open(temp_move_file, "w", encoding='utf-8') as outfile: 
+            with open(curr_move_file, "w") as outfile: 
               outfile.write(json.dumps(movements, indent=2))
-            # 重命名是原子操作
-            if os.path.exists(curr_move_file):
-              os.remove(curr_move_file)
-            os.rename(temp_move_file, curr_move_file)
             if debug:
               print(f"[DEBUG] Wrote movement file: {curr_move_file}")
           except Exception as e:
@@ -746,17 +726,27 @@ class ReverieServer:
                 self.expert_monitor.trigger_sent = False
                 self.expert_monitor_started = False
           
-          # 检测所有专家到达后触发弹窗
+          # 检查专家位置监控触发
           try:
             if (EXPERT_MONITOR_AVAILABLE and self.expert_monitor and 
-                not self.expert_monitor.trigger_sent):
-              # 检查是否所有4个专家都已到达
-              if len(self.expert_monitor.experts_arrived) >= 4:
-                print(f"[Reverie] ✅ 所有专家已到达，触发专家会议弹窗!")
+                self.expert_monitor_started and not self.expert_monitor.trigger_sent):
+              # 直接从内存中的位置数据获取专家位置
+              for expert_name in ["Education Bureau Representative", "Meeting Moderator", 
+                                "Public Health Expert", "Market Supervision Expert"]:
+                expert_pos = self.personas_tile.get(expert_name)
+                
+                # 检查是否到达目标位置（传入expert_name检查各自的目标）
+                if self.expert_monitor.is_at_target_position(expert_pos, expert_name):
+                  if expert_name not in self.expert_monitor.experts_arrived:
+                    self.expert_monitor.experts_arrived.add(expert_name)
+                    print(f"[Monitor] ✓ {expert_name} 已到达目标位置 {expert_pos}")
+              
+              # 检查是否所有专家都到达
+              if len(self.expert_monitor.experts_arrived) == 4:
                 self.expert_monitor.trigger_expert_meeting()
                 
           except Exception as e:
-            print(f"[Reverie] 专家触发异常: {e}")
+            print(f"[Reverie] 专家位置监控异常: {e}")
             pass
 
           int_counter -= 1

@@ -2,7 +2,7 @@ import os, json, sys
 from datetime import datetime
 sys.stdout.reconfigure(encoding='utf-8')
 
-storage = r'e:\generative_agents-main\environment\frontend_server\storage'
+storage = r'd:\cuc files\shuziren\news-town\generative_agents-main\environment\frontend_server\storage'
 sims = [d for d in os.listdir(storage) if d.startswith('auto_run')]
 sims.sort(reverse=True)
 sim_dir = os.path.join(storage, sims[0])

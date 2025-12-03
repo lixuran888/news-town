@@ -2,9 +2,94 @@
 {% load staticfiles %}
 
 {% block content %}
-<div style="padding:2em">
-<img src="{% static 'img/atlas.png' %}">
-Your environment server is up and running! 
+<div class="container" style="max-width: 900px; padding-top: 3em; padding-bottom: 4em;">
+  <div class="row">
+    <!-- 左侧：Logo + 当前配置 -->
+    <div class="col-md-4 text-center">
+      <img src="{% static 'img/atlas.png' %}" style="width: 120px; margin-bottom: 1em;">
+      <h3 style="font-weight: 700; margin-bottom: 0.5em;">News Town Simulation</h3>
+      <p style="color: #777;">环境前端已启动，可以在这里设置世界的开始时间。</p>
+
+      {% if current_start_date %}
+      <div style="margin-top: 1.5em; font-size: 0.95em; color: #555; text-align:left;">
+        <strong>当前配置：</strong><br>
+        开始日期：{{ current_start_date }}<br>
+        当前世界时间：{{ current_curr_time }}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- 右侧：时间设置表单 -->
+    <div class="col-md-8">
+      <div class="panel panel-default" style="box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+        <div class="panel-heading" style="background:#f8f9fa;">
+          <h4 class="panel-title" style="font-weight:600;">设置世界开始时间</h4>
+        </div>
+        <div class="panel-body">
+
+          {% if error %}
+          <div class="alert alert-danger" role="alert" style="margin-bottom: 1em;">
+            {{ error }}
+          </div>
+          {% endif %}
+
+          {% if message %}
+          <div class="alert alert-success" role="alert" style="margin-bottom: 1em;">
+            {{ message }}
+          </div>
+          {% endif %}
+
+          <form method="post" class="form-horizontal">
+            {% csrf_token %}
+
+            <div class="form-group">
+              <label class="col-sm-3 control-label">开始日期</label>
+              <div class="col-sm-9">
+                <input
+                  type="date"
+                  name="start_date"
+                  class="form-control"
+                  value="{{ initial_date_iso }}"
+                  required
+                >
+                <p class="help-block">选择模拟世界的开始日期，例如：2025-12-01。</p>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="col-sm-3 control-label">开始时间</label>
+              <div class="col-sm-9">
+                <input
+                  type="time"
+                  name="start_time"
+                  class="form-control"
+                  value="{{ initial_time_iso|default:'00:00' }}"
+                  step="60"
+                >
+                <p class="help-block">可选项，默认为 00:00。精确到分钟即可。</p>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 1.5em;">
+              <div class="col-sm-offset-3 col-sm-9">
+                <button type="submit" class="btn btn-primary">
+                  <span class="glyphicon glyphicon-time"></span>
+                  &nbsp;保存开始时间
+                </button>
+                <a href="{% url 'home' %}" class="btn btn-default" style="margin-left: 0.5em;">
+                  进入实时仿真
+                </a>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <p style="font-size: 0.9em; color:#888;">
+        提示：这里修改的是模板仿真 <code>base_the_ville_clean</code> 的 <code>meta.json</code>，
+        下次运行新的仿真（或自动生成新仿真目录）时，会以你设置的开始时间为基准推进世界时间。
+      </p>
+    </div>
+  </div>
 </div>
 {% endblock content %}
-
