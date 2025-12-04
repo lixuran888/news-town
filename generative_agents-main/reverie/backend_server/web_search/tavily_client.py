@@ -1,10 +1,18 @@
 import os
+import sys
 from typing import List
 
 import requests
 
+# 添加父目录到路径以导入 utils
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+try:
+  from utils import tavily_api_key
+except ImportError:
+  tavily_api_key = ""
 
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+# 优先使用 utils.py 配置，其次使用环境变量
+TAVILY_API_KEY = tavily_api_key or os.getenv("TAVILY_API_KEY", "")
 TAVILY_ENDPOINT = "https://api.tavily.com/search"
 
 

@@ -110,30 +110,36 @@ def generate_hourly_schedule(persona, wake_up_hour):
                    "03:00 PM", "04:00 PM", "05:00 PM", "06:00 PM", "07:00 PM", 
                    "08:00 PM", "09:00 PM", "10:00 PM", "11:00 PM"]
   
-  n_m1_activity = []
-  diversity_repeat_count = 3
-  
-  # 分段生成：上午(0-12) + 下午(12-24)
-  for i in range(diversity_repeat_count): 
-    if len(set(n_m1_activity)) < 5: 
-      n_m1_activity = []
-      temp_wake = wake_up_hour
-      
-      # 上午：0-12点
-      for curr_hour_str in hour_str_full[:12]: 
-        if temp_wake > 0: 
-          n_m1_activity += ["sleeping"]
-          temp_wake -= 1
-        else: 
+  # ========== 快速测试模式（用完删除）==========
+  FAST_TEST_MODE = True
+  if FAST_TEST_MODE:
+    n_m1_activity = ["sleeping"] * wake_up_hour + ["idle"] * (24 - wake_up_hour)
+    print(f"[FastTest] {persona.scratch.name} 使用默认日程，跳过LLM")
+  else:
+    n_m1_activity = []
+    diversity_repeat_count = 3
+    
+    # 分段生成：上午(0-12) + 下午(12-24)
+    for i in range(diversity_repeat_count): 
+      if len(set(n_m1_activity)) < 2: 
+        n_m1_activity = []
+        temp_wake = wake_up_hour
+        
+        # 上午：0-12点
+        for curr_hour_str in hour_str_full[:12]: 
+          if temp_wake > 0: 
+            n_m1_activity += ["sleeping"]
+            temp_wake -= 1
+          else: 
+            n_m1_activity += [run_gpt_prompt_generate_hourly_schedule(
+                            persona, curr_hour_str, n_m1_activity, hour_str_full)[0]]
+        
+        # 下午：12-24点（传入完整hour_str_full，让LLM知道这是同一天的延续）
+        for curr_hour_str in hour_str_full[12:]: 
           n_m1_activity += [run_gpt_prompt_generate_hourly_schedule(
                           persona, curr_hour_str, n_m1_activity, hour_str_full)[0]]
-      
-      # 下午：12-24点（传入完整hour_str_full，让LLM知道这是同一天的延续）
-      for curr_hour_str in hour_str_full[12:]: 
-        n_m1_activity += [run_gpt_prompt_generate_hourly_schedule(
-                        persona, curr_hour_str, n_m1_activity, hour_str_full)[0]]
-  
-  print(f"✅ {persona.scratch.name} 日程生成完成：共{len(n_m1_activity)}小时")
+    
+    print(f"✅ {persona.scratch.name} 日程生成完成：共{len(n_m1_activity)}小时")
   
   # Step 1. Compressing the hourly schedule to the following format: 
   # The integer indicates the number of hours. They should add up to 24. 
@@ -163,45 +169,13 @@ def generate_hourly_schedule(persona, wake_up_hour):
     n_m1_hourly_compressed += [[task, duration*60]]
 
   # ========== 确保所有agent日程完整24小时 ==========
-  # 专家列表
-  experts_list = [
-    "Public Health Expert",
-    "Market Supervision Expert",
-    "Education Bureau Representative",
-    "Meeting Moderator"
-  ]
-  # 会议地点（使用地图上的命名地点，确保可达）
-  MEETING_LOCATION = "the Ville:Dorm for Oak Hill College:common room"
-  
-  is_expert = persona.scratch.name in experts_list
+  # 专家和普通agent都由LLM自由生成日程，不再强制添加任务
   total_minutes = sum(item[1] for item in n_m1_hourly_compressed)
 
-  if is_expert:
-    # 专家：截断到23:00，强制添加移动任务
-    meeting_start = 1380  # 23:00
-    kept = []
-    curr = 0
-    for task, dur in n_m1_hourly_compressed:
-      if curr + dur <= meeting_start:
-        kept.append([task, dur])
-        curr += dur
-      else:
-        if meeting_start - curr > 0:
-          kept.append([task, meeting_start - curr])
-        break
-    # 补足到23:00
-    curr = sum(x[1] for x in kept)
-    if curr < meeting_start:
-      kept.append(["preparing for the expert meeting", meeting_start - curr])
-    # 强制23:00移动任务（60分钟），使用地点名称
-    kept.append([f"{MEETING_LOCATION}:<random>", 60])
-    n_m1_hourly_compressed = kept
-    print(f"[Plan] Expert {persona.scratch.name} -> {MEETING_LOCATION}")
-  else:
-    # 普通agent：补足到24小时
-    if total_minutes < 1440:
-      n_m1_hourly_compressed.append(["sleeping", 1440 - total_minutes])
-      print(f"✅ {persona.scratch.name} 日程补足到24小时")
+  # 所有agent：补足到24小时
+  if total_minutes < 1440:
+    n_m1_hourly_compressed.append(["sleeping", 1440 - total_minutes])
+    print(f"✅ {persona.scratch.name} 日程补足到24小时")
   # ========== 日程完整性保证结束 ==========
 
   return n_m1_hourly_compressed
@@ -337,7 +311,13 @@ def generate_action_arena(act_desp, persona, maze, act_world, act_sector):
     if name == "Isabella Rodriguez":
       return "Isabella Rodriguez's room"
 
-  return run_gpt_prompt_action_arena(act_desp, persona, maze, act_world, act_sector)[0]
+  result = run_gpt_prompt_action_arena(act_desp, persona, maze, act_world, act_sector)
+  if result is None or result[0] is None:
+    arenas = maze.address_tiles.get(f"{act_world}:{act_sector}", {}).keys()
+    default_arena = list(arenas)[0] if arenas else "common room"
+    print(f"[Plan] WARNING: arena is None, using: {default_arena}")
+    return default_arena
+  return result[0]
 
 
 def generate_action_game_object(act_desp, act_address, persona, maze):
@@ -618,21 +598,11 @@ def revise_identity(persona):
   daily_req_prompt += f"Follow this format (the list should have 4~6 items but no more):\n"
   daily_req_prompt += f"1. wake up and complete the morning routine at <time>, 2. ..."
 
-  # 专家保留原有的daily_plan_req，不重新生成
-  experts_and_moderator = [
-    "Public Health Expert",
-    "Market Supervision Expert", 
-    "Education Bureau Representative",
-    "Meeting Moderator"
-  ]
-  
-  if persona.scratch.name not in experts_and_moderator:
-    new_daily_req = ChatGPT_single_request(daily_req_prompt)
-    new_daily_req = new_daily_req.replace('\n', ' ')
-    print ("WE ARE HERE!!!", new_daily_req)
-    persona.scratch.daily_plan_req = new_daily_req
-  else:
-    print(f"专家 {persona.scratch.name} 保留原有daily_plan_req，不重新生成")
+  # 所有agent（包括专家）都由LLM生成日程
+  new_daily_req = ChatGPT_single_request(daily_req_prompt)
+  new_daily_req = new_daily_req.replace('\n', ' ')
+  print ("WE ARE HERE!!!", new_daily_req)
+  persona.scratch.daily_plan_req = new_daily_req
 
 
 def _seed_public_health_expert_food_poisoning_memory(persona):
@@ -758,6 +728,16 @@ def _long_term_planning(persona, new_day):
              "New day", or False (for neither). This is important because we
              create the personas' long term planning on the new day. 
   """
+  # ========== 快速测试模式（用完删除）==========
+  FAST_TEST_MODE = True
+  if FAST_TEST_MODE:
+    wake_up_hour = 8
+    persona.scratch.daily_req = ["wake up at 8am", "idle during day", "attend meeting at 11pm"]
+    persona.scratch.f_daily_schedule = generate_hourly_schedule(persona, wake_up_hour)
+    print(f"[FastTest] {persona.scratch.name} 完成快速初始化")
+    return
+  # ========== 快速测试模式结束 ==========
+  
   # We start by creating the wake up hour for the persona. 
   wake_up_hour = generate_wake_up_hour(persona)
 
@@ -932,9 +912,17 @@ def _determine_action(persona, maze):
   # * Decompose * 
   # During the first hour of the day, we need to decompose two hours 
   # sequence. We do that here. 
+  # 安全检查：确保日程不为空或None
+  if persona.scratch.f_daily_schedule is None or len(persona.scratch.f_daily_schedule) == 0:
+    print(f"[Plan] WARNING: {persona.scratch.name} has None/empty schedule, adding default")
+    persona.scratch.f_daily_schedule = [["idle", 1440]]  # 默认整天空闲
+  
   if curr_index == 0:
     # This portion is invoked if it is the first hour of the day. 
-    act_desp, act_dura = persona.scratch.f_daily_schedule[curr_index]
+    if curr_index < len(persona.scratch.f_daily_schedule):
+      act_desp, act_dura = persona.scratch.f_daily_schedule[curr_index]
+    else:
+      act_desp, act_dura = "idle", 60
     if act_dura >= 60: 
       # We decompose if the next action is longer than an hour, and fits the
       # criteria described in determine_decomp.
@@ -985,27 +973,52 @@ def _determine_action(persona, maze):
 
 
 
-  act_desp, act_dura = persona.scratch.f_daily_schedule[curr_index] 
+  # 安全检查
+  if curr_index >= len(persona.scratch.f_daily_schedule):
+    print(f"[Plan] WARNING: curr_index {curr_index} out of range for {persona.scratch.name}, using default")
+    act_desp, act_dura = "idle", 60
+  else:
+    act_desp, act_dura = persona.scratch.f_daily_schedule[curr_index]
 
-
-
-  # Finding the target location of the action and creating action-related
-  # variables.
-  act_world = maze.access_tile(persona.scratch.curr_tile)["world"]
-  # act_sector = maze.access_tile(persona.scratch.curr_tile)["sector"]
-  act_sector = generate_action_sector(act_desp, persona, maze)
-  act_arena = generate_action_arena(act_desp, persona, maze, act_world, act_sector)
-  act_address = f"{act_world}:{act_sector}:{act_arena}"
-  act_game_object = generate_action_game_object(act_desp, act_address,
-                                                persona, maze)
-  new_address = f"{act_world}:{act_sector}:{act_arena}:{act_game_object}"
-  act_pron = generate_action_pronunciatio(act_desp, persona)
-  act_event = generate_action_event_triple(act_desp, persona)
-  # Persona's actions also influence the object states. We set those up here. 
-  act_obj_desp = generate_act_obj_desc(act_game_object, act_desp, persona)
-  act_obj_pron = generate_action_pronunciatio(act_obj_desp, persona)
-  act_obj_event = generate_act_obj_event_triple(act_game_object, 
-                                                act_obj_desp, persona)
+  # ========== 快速测试模式：跳过所有LLM调用 ==========
+  FAST_TEST_MODE = True
+  if FAST_TEST_MODE:
+    curr_tile = persona.scratch.curr_tile
+    tile_info = maze.access_tile(curr_tile)
+    act_world = tile_info["world"]
+    act_sector = tile_info["sector"]
+    act_arena = tile_info["arena"]
+    new_address = f"{act_world}:{act_sector}:{act_arena}:<random>"
+    act_pron = "🚶"
+    act_event = (persona.scratch.name, "is", act_desp)
+    act_obj_desp = f"idle"
+    act_obj_pron = "⏳"
+    act_obj_event = ("object", "is", "idle")
+    print(f"[FastTest] {persona.scratch.name}: {act_desp[:30]}... @ {act_sector}")
+  else:
+    # Finding the target location of the action and creating action-related
+    # variables.
+    act_world = maze.access_tile(persona.scratch.curr_tile)["world"]
+    # act_sector = maze.access_tile(persona.scratch.curr_tile)["sector"]
+    act_sector = generate_action_sector(act_desp, persona, maze)
+    if act_sector is None:
+      act_sector = maze.access_tile(persona.scratch.curr_tile)["sector"]
+      print(f"[Plan] WARNING: act_sector is None for {persona.scratch.name}, using current sector: {act_sector}")
+    act_arena = generate_action_arena(act_desp, persona, maze, act_world, act_sector)
+    if act_arena is None:
+      act_arena = maze.access_tile(persona.scratch.curr_tile)["arena"]
+      print(f"[Plan] WARNING: act_arena is None for {persona.scratch.name}, using current arena: {act_arena}")
+    act_address = f"{act_world}:{act_sector}:{act_arena}"
+    act_game_object = generate_action_game_object(act_desp, act_address,
+                                                  persona, maze)
+    new_address = f"{act_world}:{act_sector}:{act_arena}:{act_game_object}"
+    act_pron = generate_action_pronunciatio(act_desp, persona)
+    act_event = generate_action_event_triple(act_desp, persona)
+    # Persona's actions also influence the object states. We set those up here. 
+    act_obj_desp = generate_act_obj_desc(act_game_object, act_desp, persona)
+    act_obj_pron = generate_action_pronunciatio(act_obj_desp, persona)
+    act_obj_event = generate_act_obj_event_triple(act_game_object, 
+                                                  act_obj_desp, persona)
 
   # Adding the action to persona's queue. 
   persona.scratch.add_new_action(new_address, 
@@ -1532,6 +1545,12 @@ def plan(persona, maze, personas, new_day, retrieved):
     if persona_name != persona.scratch.chatting_with: 
       persona.scratch.chatting_with_buffer[persona_name] -= 1
 
+  # 安全检查：确保返回值不为None
+  if persona.scratch.act_address is None:
+    print(f"[Plan] WARNING: act_address is None for {persona.scratch.name}, using default")
+    curr_tile = persona.scratch.curr_tile
+    persona.scratch.act_address = f"<waiting> {curr_tile[0]} {curr_tile[1]}"
+  
   return persona.scratch.act_address
 
 

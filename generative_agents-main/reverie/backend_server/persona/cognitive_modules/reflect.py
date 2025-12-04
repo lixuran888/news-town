@@ -319,9 +319,13 @@ def reflect(persona):
 
       # make sure you set the fillings as well
 
-      # print (persona.a_mem.get_last_chat(persona.scratch.chatting_with).node_id)
-
-      evidence = [persona.a_mem.get_last_chat(persona.scratch.chatting_with).node_id]
+      # 获取对话证据（专家会议可能没有对应的 chat 记录）
+      try:
+        last_chat = persona.a_mem.get_last_chat(persona.scratch.chatting_with)
+        evidence = [last_chat.node_id] if last_chat else []
+      except Exception:
+        # 专家会议等特殊对话可能没有传统的 chat 记录
+        evidence = []
 
       planning_thought = generate_planning_thought_on_convo(persona, all_utt)
       planning_thought = f"For {persona.scratch.name}'s planning: {planning_thought}"
