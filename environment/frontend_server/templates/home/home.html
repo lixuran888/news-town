@@ -79,6 +79,392 @@
 <div style="padding-bottom:15em"> </div>
 
 
+<!-- Expert Meeting Modal -->
+<div id="expert-meeting-overlay" class="expert-meeting-overlay" style="display:none;">
+  <section class="expert-board-wrapper">
+    <div class="expert-board">
+      <header class="expert-board-header">
+        <div>
+          <span class="expert-board-title">🎯 专家会议</span>
+          <span class="expert-board-subtitle">校园食物中毒事件讨论</span>
+        </div>
+        <div class="expert-board-actions">
+          <span class="expert-board-round" id="expert-round-info">等待开始...</span>
+          <button class="expert-board-exit" id="expert-close-btn" aria-label="关闭弹窗">×</button>
+        </div>
+      </header>
+      <div class="expert-stage" id="expert-stage">
+        <!-- 专家发言卡片将在这里动态生成 -->
+        <div class="expert-waiting">
+          <div class="expert-waiting-icon">⏰</div>
+          <p>专家会议已触发，正在准备中...</p>
+          <p class="expert-waiting-hint">（此处将显示专家们的发言）</p>
+        </div>
+      </div>
+      <div class="expert-thinking-indicator" id="expert-thinking"></div>
+    </div>
+  </section>
+</div>
+
+<style>
+/* Expert Meeting Modal Styles */
+.expert-meeting-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 2000;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding-right: 48px;
+}
+
+.expert-board-wrapper {
+  cursor: grab;
+}
+
+.expert-board-wrapper.dragging {
+  cursor: grabbing;
+}
+
+.expert-board {
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  height: calc(100vh - 60px);
+  max-height: calc(100vh - 60px);
+  background: rgba(15, 23, 42, 0.95);
+  border-radius: 24px;
+  border: 1px solid rgba(147, 197, 253, 0.35);
+  box-shadow: 0 35px 80px rgba(2, 6, 23, 0.65);
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: #e2e8f0;
+  font-family: "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+}
+
+.expert-board-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  user-select: none;
+  cursor: grab;
+}
+
+.expert-board-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.expert-board-subtitle {
+  display: block;
+  font-size: 0.85rem;
+  color: rgba(226, 232, 240, 0.7);
+  margin-top: 4px;
+}
+
+.expert-board-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.expert-board-round {
+  font-size: 0.9rem;
+  color: rgba(226, 232, 240, 0.7);
+}
+
+.expert-board-exit {
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.18);
+  color: #fecaca;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.expert-board-exit:hover {
+  background: rgba(239, 68, 68, 0.32);
+}
+
+.expert-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 1;
+  max-height: none;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.expert-stage::-webkit-scrollbar {
+  width: 6px;
+}
+
+.expert-stage::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 999px;
+}
+
+.expert-waiting {
+  text-align: center;
+  padding: 40px 20px;
+  color: rgba(226, 232, 240, 0.8);
+}
+
+.expert-waiting-icon {
+  font-size: 3rem;
+  margin-bottom: 16px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.expert-waiting-hint {
+  font-size: 0.85rem;
+  color: rgba(148, 163, 184, 0.6);
+  margin-top: 8px;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+.expert-card {
+  background: rgba(30, 41, 59, 0.8);
+  border-radius: 12px;
+  border: 1px solid rgba(147, 197, 253, 0.25);
+  padding: 16px;
+  animation: slideIn 0.4s ease forwards;
+}
+
+.expert-card.expert-health { border-left: 3px solid #60a5fa; }
+.expert-card.expert-market { border-left: 3px solid #f8fafc; }
+.expert-card.expert-education { border-left: 3px solid #f87171; }
+.expert-card.expert-moderator { border-left: 3px solid #bef264; }
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.expert-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.expert-card-name {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.expert-card-role {
+  font-size: 0.8rem;
+  color: rgba(148, 163, 184, 0.8);
+}
+
+.expert-card-content {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.expert-thinking-indicator {
+  text-align: center;
+  padding: 10px;
+  color: rgba(226, 232, 240, 0.7);
+  font-size: 0.9rem;
+  display: none;
+}
+
+.expert-thinking-indicator.active {
+  display: block;
+}
+
+/* 会议发言内容样式 */
+.expert-speeches {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.speech-item {
+  background: rgba(30, 41, 59, 0.8);
+  border-radius: 12px;
+  border: 1px solid rgba(147, 197, 253, 0.2);
+  padding: 14px;
+  animation: slideIn 0.3s ease forwards;
+}
+
+.speech-item.speech-opening {
+  border-left: 3px solid #bef264;
+  background: rgba(190, 242, 100, 0.08);
+}
+
+.speech-item.speech-question {
+  border-left: 3px solid #60a5fa;
+  background: rgba(96, 165, 250, 0.08);
+}
+
+.speech-item.speech-summary {
+  border-left: 3px solid #f472b6;
+  background: rgba(244, 114, 182, 0.08);
+}
+
+.speech-item.speech-feedback {
+  border-left: 3px solid #fbbf24;
+  background: rgba(251, 191, 36, 0.08);
+  font-size: 0.9rem;
+  padding: 10px 14px;
+}
+
+.speech-item.speech-advice {
+  border-left: 3px solid #a78bfa;
+  background: rgba(167, 139, 250, 0.1);
+  font-size: 0.9rem;
+  padding: 12px 14px;
+}
+
+/* 思考过程样式 */
+.reasoning-section {
+  margin: 8px 0;
+  background: rgba(30, 41, 59, 0.8);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.reasoning-toggle {
+  cursor: pointer;
+  padding: 8px 12px;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  user-select: none;
+}
+
+.reasoning-toggle:hover {
+  color: #e2e8f0;
+}
+
+.reasoning-content {
+  padding: 8px 12px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.reasoning-item {
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  padding-bottom: 8px;
+}
+
+.reasoning-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.reasoning-item strong {
+  display: block;
+  color: #93c5fd;
+  font-size: 0.8rem;
+  margin-bottom: 4px;
+}
+
+.reasoning-item pre {
+  font-size: 0.75rem;
+  color: #cbd5e1;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  font-family: "Consolas", "Monaco", monospace;
+  background: rgba(15, 23, 42, 0.5);
+  padding: 8px;
+  border-radius: 4px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.speech-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.speech-role {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #e2e8f0;
+}
+
+.speech-type {
+  font-size: 0.75rem;
+  color: rgba(148, 163, 184, 0.8);
+  background: rgba(148, 163, 184, 0.15);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.speech-content {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: rgba(226, 232, 240, 0.9);
+  white-space: pre-wrap;
+}
+
+/* 等待提示样式 */
+.speech-pending {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  color: #60a5fa;
+  font-size: 0.95rem;
+  background: rgba(96, 165, 250, 0.08);
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+.pending-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  background: #60a5fa;
+  border-radius: 50%;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+.speech-completed {
+  padding: 12px 16px;
+  color: #4ade80;
+  font-size: 0.9rem;
+  background: rgba(74, 222, 128, 0.08);
+  border-radius: 8px;
+  margin-top: 8px;
+  text-align: center;
+}
+
+.speech-error {
+  padding: 12px 16px;
+  color: #f87171;
+  font-size: 0.9rem;
+  background: rgba(248, 113, 113, 0.08);
+  border-radius: 8px;
+  margin-top: 8px;
+}
+</style>
+
 <!-- Persona State Details Modal -->
 <div class="modal fade" id="personaStateModal" tabindex="-1" role="dialog" aria-labelledby="personaStateModalLabel">
   <div class="modal-dialog modal-lg" role="document" style="width:90%; max-width:1200px;">

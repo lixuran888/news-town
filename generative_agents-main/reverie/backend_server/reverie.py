@@ -40,30 +40,12 @@ from utils import collision_block_id
 from expert_init import (
   inject_food_poisoning_event,
   generate_and_broadcast_public_opinion,
+  ExpertMeeting,
 )
 from opinion_collector import collect_and_inject_opinions
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-# 添加expert_system工具目录到路径
-# 从当前文件位置: generative_agents-main/generative_agents-main/reverie/backend_server/reverie.py
-# 需要回到: generative_agents-main/seminar_expert/expert_system
-expert_system_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'seminar_expert', 'expert_system')
-expert_system_path = os.path.abspath(expert_system_path)  # 转换为绝对路径
-sys.path.append(expert_system_path)
-
-print(f"[Reverie] 尝试从路径加载专家模块: {expert_system_path}")
-print(f"[Reverie] 路径是否存在: {os.path.exists(expert_system_path)}")
-
-try:
-    from expert_position_monitor import ExpertPositionMonitor
-    EXPERT_MONITOR_AVAILABLE = True
-    print("[Reverie] 专家位置监控模块已加载")
-except ImportError as e:
-    print(f"[Reverie] 专家位置监控模块加载失败: {e}")
-    print(f"[Reverie] 当前 sys.path: {sys.path[-3:]}")  # 显示最后3个路径
-    EXPERT_MONITOR_AVAILABLE = False
-    ExpertPositionMonitor = None
 
 ##############################################################################
 #                                  REVERIE                                   #
@@ -197,20 +179,13 @@ class ReverieServer:
 
       # 每次 fork 新世界时，只继承身份和长期记忆，
       # 但当天状态 / 日程不应沿用旧世界，否则会出现“整天睡觉”的计划。
-      # 因此这里显式重置与“今天”相关的 scratch 状态，让新世界从当前
+      # 因此这里显式重置与"今天"相关的 scratch 状态，让新世界从当前
       # Reverie 的 curr_time 作为一个全新的 "First day" 重新规划日程。
       s = curr_persona.scratch
       s.curr_time = None
       
-      # 专家保留daily_plan_req，普通agent清空
-      experts_and_moderator = [
-        "Public Health Expert",
-        "Market Supervision Expert", 
-        "Education Bureau Representative",
-        "Meeting Moderator"
-      ]
-      if curr_persona.name not in experts_and_moderator:
-        s.daily_plan_req = None
+      # 所有agent（包括专家）都清空daily_plan_req，由LLM重新生成日程
+      s.daily_plan_req = None
       
       s.daily_req = []
       s.f_daily_schedule = []
@@ -264,14 +239,8 @@ class ReverieServer:
     # cycle; this is to not kill our machine. 
     self.server_sleep = 0.1
     
-    # EXPERT POSITION MONITOR:
-    # Initialize expert position monitor for 23:00 trigger
-    if EXPERT_MONITOR_AVAILABLE:
-      self.expert_monitor = ExpertPositionMonitor(f"{fs_storage}/{self.sim_code}")
-      self.expert_monitor_started = False
-    else:
-      self.expert_monitor = None
-      self.expert_monitor_started = False
+    # 23:00会议弹窗触发标记
+    self.meeting_triggered = False
 
     # SIGNALING THE FRONTEND SERVER: 
     # curr_sim_code.json contains the current simulation code, and
@@ -543,129 +512,29 @@ class ReverieServer:
           movements = {"persona": dict(), 
                        "meta": dict()}
           for persona_name, persona in self.personas.items(): 
-            # <next_tile> is a x,y coordinate. e.g., (58, 9)
-            # <pronunciatio> is an emoji. e.g., "\ud83d\udca4"
-            # <description> is a string description of the movement. e.g., 
-            #   writing her next novel (editing her novel) 
-            #   @ double studio:double studio:common room:sofa
-            next_tile, pronunciatio, description = persona.move(
-              self.maze, self.personas, self.personas_tile[persona_name], 
-              self.curr_time)
+            # 每个 persona 单独 try-except，确保一个出错不影响时间流逝
+            try:
+              # <next_tile> is a x,y coordinate. e.g., (58, 9)
+              # <pronunciatio> is an emoji. e.g., "\ud83d\udca4"
+              # <description> is a string description of the movement. e.g., 
+              #   writing her next novel (editing her novel) 
+              #   @ double studio:double studio:common room:sofa
+              next_tile, pronunciatio, description = persona.move(
+                self.maze, self.personas, self.personas_tile[persona_name], 
+                self.curr_time)
+            except Exception as move_error:
+              print(f"[Reverie] ERROR in {persona_name}.move(): {move_error}")
+              next_tile = self.personas_tile.get(persona_name, (0, 0))
+              pronunciatio = "..."
+              description = f"idle (error)"
 
-            # ========== 专家23:00强制移动到会议地点 ==========
-            # 停下一切工作（对话、睡觉等），使用寻路系统移动到目标位置！
-            experts_and_moderator = [
-              "Public Health Expert",
-              "Market Supervision Expert", 
-              "Education Bureau Representative",
-              "Meeting Moderator"
-            ]
-            # 使用地图上的命名地点作为目标（确保可达）
-            EXPERT_MEETING_LOCATION = "the Ville:Dorm for Oak Hill College:common room"
-            
-            if persona_name in experts_and_moderator and self.curr_time.hour >= 23:
-              curr_pos = self.personas_tile[persona_name]
-              
-              # 从地点获取目标坐标（每个专家选不同的格子避免重叠）
-              if EXPERT_MEETING_LOCATION in self.maze.address_tiles:
-                meeting_tiles = list(self.maze.address_tiles[EXPERT_MEETING_LOCATION])
-                # 过滤掉被阻塞的格子
-                valid_tiles = []
-                for tile in meeting_tiles:
-                  if self.maze.collision_maze[tile[1]][tile[0]].strip() == "0":
-                    valid_tiles.append(tile)
-                if valid_tiles:
-                  expert_index = experts_and_moderator.index(persona_name)
-                  target = valid_tiles[expert_index % len(valid_tiles)]
-                else:
-                  target = (120, 49)  # 备用
-              else:
-                # 备用坐标（可达）
-                target = (120, 49)
-              
-              # 判断是否已到达目标（允许3格容差，因为是同一区域）
-              at_target = (abs(curr_pos[0] - target[0]) <= 3 and 
-                          abs(curr_pos[1] - target[1]) <= 3)
-              
-              # 检查是否已有有效路径
-              has_valid_path = (persona.scratch.planned_path and 
-                               len(persona.scratch.planned_path) > 0)
-              
-              # 如果还没到达目标位置，使用寻路系统强制移动
-              if not at_target:
-                # 强制停止对话！同时清空聊天对象的状态
-                if persona.scratch.chatting_with:
-                  chat_partner_name = persona.scratch.chatting_with
-                  if chat_partner_name in self.personas:
-                    partner = self.personas[chat_partner_name]
-                    partner.scratch.chat = None
-                    partner.scratch.chatting_with = None
-                    partner.scratch.chatting_end_time = None
-                    print(f"🔇 清空聊天对象 {chat_partner_name} 的对话状态")
-                
-                persona.scratch.chat = None
-                persona.scratch.chatting_with = None
-                persona.scratch.chatting_end_time = None
-                
-                # 只在没有有效路径时才重新计算（优化性能）
-                if not has_valid_path:
-                  # 使用path_finder计算路径（考虑障碍物）
-                  try:
-                    path = path_finder(self.maze.collision_maze, curr_pos, target, collision_block_id)
-                    
-                    if path and len(path) > 1:
-                      # 设置寻路路径
-                      persona.scratch.planned_path = path[1:]
-                      persona.scratch.act_path_set = True  # 防止下一步被覆盖！
-                      next_tile = path[1]
-                      print(f"🚨 强制寻路: {persona_name} 从 {curr_pos} 到 {target}，路径长度 {len(path)}")
-                    else:
-                      # 寻路失败：尝试直线移动（检查碰撞）
-                      dx = 1 if target[0] > curr_pos[0] else (-1 if target[0] < curr_pos[0] else 0)
-                      dy = 1 if target[1] > curr_pos[1] else (-1 if target[1] < curr_pos[1] else 0)
-                      candidate = (curr_pos[0] + dx, curr_pos[1] + dy)
-                      # 检查候选格子是否可走
-                      if self.maze.collision_maze[candidate[1]][candidate[0]].strip() == "0":
-                        next_tile = candidate
-                        print(f"[Expert] pathfind failed, linear move: {persona_name} {curr_pos} -> {next_tile}")
-                      else:
-                        next_tile = curr_pos  # 阻塞则停在原地
-                        print(f"[Expert] pathfind failed, blocked, stay: {persona_name} {curr_pos}")
-                  except Exception as e:
-                    # 异常时停在原地
-                    next_tile = curr_pos
-                    print(f"[Expert] pathfind error, stay: {persona_name}")
-                else:
-                  # 已有有效路径，execute()已经取出了下一步，不需要再取
-                  # next_tile 已经由 persona.move() 返回，这里只需确保状态正确
-                  persona.scratch.act_path_set = True
-                  print(f"🚶 使用现有路径: {persona_name} -> {next_tile}")
-                
-                pronunciatio = "🚨"
-                description = f"URGENT: walking to expert meeting at {target}"
-              else:
-                # 已到达目标，标记为已到达
-                if EXPERT_MONITOR_AVAILABLE and self.expert_monitor:
-                  if persona_name not in self.expert_monitor.experts_arrived:
-                    self.expert_monitor.experts_arrived.add(persona_name)
-                    print(f"✅ {persona_name} 已到达会议地点 {curr_pos}")
-            # ========== 专家强制移动结束 ==========
-            
-            # 检查专家是否已到达目标位置并应该隐藏
-            should_hide_expert = False
-            if (persona_name in experts_and_moderator and 
-                EXPERT_MONITOR_AVAILABLE and self.expert_monitor and 
-                hasattr(self.expert_monitor, 'experts_arrived')):
-              should_hide_expert = persona_name in self.expert_monitor.experts_arrived
-            
-            # 只有到达目标位置的专家才隐藏
-            if not should_hide_expert:
-              movements["persona"][persona_name] = {}
-              movements["persona"][persona_name]["movement"] = next_tile
-              movements["persona"][persona_name]["pronunciatio"] = pronunciatio
-              movements["persona"][persona_name]["description"] = description
-              movements["persona"][persona_name]["chat"] = (persona
-                                                            .scratch.chat)
+            # 专家和普通agent都正常显示在地图上，不再强制移动
+            movements["persona"][persona_name] = {}
+            movements["persona"][persona_name]["movement"] = next_tile
+            movements["persona"][persona_name]["pronunciatio"] = pronunciatio
+            movements["persona"][persona_name]["description"] = description
+            movements["persona"][persona_name]["chat"] = (persona
+                                                          .scratch.chat)
 
           # Include the meta information about the current stage in the 
           # movements dictionary. 
@@ -729,35 +598,86 @@ class ReverieServer:
                 )
                 self.last_public_opinion_date = curr_date
                 
-              # 23:00后开始检查专家位置（无需启动监控）
-              if EXPERT_MONITOR_AVAILABLE and self.expert_monitor:
-                self.expert_monitor_started = True
+              # 23:00准时触发会议弹窗并运行专家会议
+              if not self.meeting_triggered:
+                print(f"[Reverie] ⏰ 23:00 准时触发专家会议!")
+                
+                # 运行专家会议
+                meeting_topic = "校园食物中毒事件的应对措施与责任追究"
+                trigger_file = f"{fs_temp_storage}/expert_meeting_trigger.json"
+                
+                # 定义实时更新触发文件的回调函数
+                def update_trigger_file(speeches, status="in_progress", pending_speaker=None):
+                  trigger_data = {
+                    "timestamp": self.curr_time.isoformat(),
+                    "action": "show_expert_conversation",
+                    "topic": meeting_topic,
+                    "speeches": speeches,
+                    "status": status,
+                    "pending_speaker": pending_speaker,
+                    "round_summaries": []
+                  }
+                  with open(trigger_file, "w", encoding="utf-8") as f:
+                    json.dump(trigger_data, f, ensure_ascii=False, indent=2)
+                
+                try:
+                  meeting = ExpertMeeting(self.personas, meeting_topic, self.curr_time)
+                  
+                  # 1. 先创建触发文件，显示"准备中"
+                  update_trigger_file([], status="preparing", pending_speaker="主持人")
+                  print(f"[Meeting] 弹窗已触发，等待主持人开场...")
+                  
+                  # 2. 主持人开场
+                  opening = meeting.start_meeting()
+                  update_trigger_file(meeting.get_all_speeches(), status="in_progress", pending_speaker=None)
+                  print(f"[Meeting] 主持人开场完成")
+                  
+                  # 3. 运行多轮讨论（共3轮）
+                  total_rounds = 3
+                  for round_num in range(1, total_rounds + 1):
+                    round_results = meeting.run_full_round_streaming(update_trigger_file)
+                    print(f"[Meeting] 第{round_num}轮讨论完成，共 {len(round_results)} 条发言")
+                  
+                  # 4. 完成：设置对话状态触发反思
+                  meeting.finalize_meeting()
+                  
+                  # 5. 最终更新触发文件
+                  trigger_data = {
+                    "timestamp": self.curr_time.isoformat(),
+                    "action": "show_expert_conversation",
+                    "topic": meeting_topic,
+                    "speeches": meeting.get_all_speeches(),
+                    "status": "completed",
+                    "round_summaries": meeting.round_summaries
+                  }
+                  with open(trigger_file, "w", encoding="utf-8") as f:
+                    json.dump(trigger_data, f, ensure_ascii=False, indent=2)
+                  
+                  print(f"[Meeting] 会议内容已保存到触发文件")
+                  
+                except Exception as e:
+                  print(f"[Meeting] 会议运行异常: {e}")
+                  traceback.print_exc()
+                  trigger_data = {
+                    "timestamp": self.curr_time.isoformat(),
+                    "action": "show_expert_conversation",
+                    "status": "error",
+                    "error": str(e)
+                  }
+                  with open(trigger_file, "w", encoding="utf-8") as f:
+                    json.dump(trigger_data, f, ensure_ascii=False)
+                
+                self.meeting_triggered = True
                 
           except Exception:
             # 不让舆论模块的异常影响主循环
             pass
           
-          # 06:00 重置专家状态（会议结束，新的一天开始）
+          # 06:00 重置会议状态（新的一天开始）
           if self.curr_time.hour == 6 and self.curr_time.minute == 0:
-            if EXPERT_MONITOR_AVAILABLE and self.expert_monitor:
-              if self.expert_monitor.experts_arrived or self.expert_monitor.trigger_sent:
-                print(f"[Reverie] 06:00 重置专家会议状态")
-                self.expert_monitor.experts_arrived = set()
-                self.expert_monitor.trigger_sent = False
-                self.expert_monitor_started = False
-          
-          # 检测所有专家到达后触发弹窗
-          try:
-            if (EXPERT_MONITOR_AVAILABLE and self.expert_monitor and 
-                not self.expert_monitor.trigger_sent):
-              # 检查是否所有4个专家都已到达
-              if len(self.expert_monitor.experts_arrived) >= 4:
-                print(f"[Reverie] ✅ 所有专家已到达，触发专家会议弹窗!")
-                self.expert_monitor.trigger_expert_meeting()
-                
-          except Exception as e:
-            print(f"[Reverie] 专家触发异常: {e}")
-            pass
+            if self.meeting_triggered:
+              print(f"[Reverie] 06:00 重置会议状态")
+              self.meeting_triggered = False
 
           int_counter -= 1
           

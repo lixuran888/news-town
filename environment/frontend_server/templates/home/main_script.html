@@ -550,6 +550,283 @@
 	// Control button binders
 	var play_button=document.getElementById("play_button");
 	var pause_button=document.getElementById("pause_button");
+
+	// ###########################################################################
+	// EXPERT MEETING TRIGGER CHECK
+	// ###########################################################################
+	
+	let expertMeetingShown = false;
+	let expertMeetingCheckInterval = null;
+	
+	// 检查专家会议是否触发
+	function checkExpertMeetingTrigger() {
+		if (expertMeetingShown) return; // 已显示过则不再检查
+		
+		var xobj = new XMLHttpRequest();
+		xobj.overrideMimeType("application/json");
+		xobj.open('GET', "{% url 'check_expert_meeting' %}", true);
+		xobj.onreadystatechange = function() {
+			if (this.readyState === 4 && this.status === 200) {
+				try {
+					var response = JSON.parse(xobj.responseText);
+					if (response.triggered && !expertMeetingShown) {
+						console.log("[Expert Meeting] 🎯 会议触发!", response);
+						showExpertMeetingModal(response);
+						expertMeetingShown = true;
+						// 停止轮询
+						if (expertMeetingCheckInterval) {
+							clearInterval(expertMeetingCheckInterval);
+						}
+					}
+				} catch(e) {
+					console.error("[Expert Meeting] 解析响应失败:", e);
+				}
+			}
+		};
+		xobj.send();
+	}
+	
+	// 简单的Markdown转HTML函数
+	function simpleMarkdown(text) {
+		if (!text) return '';
+		return text
+			// 标题
+			.replace(/^### (.+)$/gm, '<h4>$1</h4>')
+			.replace(/^## (.+)$/gm, '<h3>$1</h3>')
+			.replace(/^# (.+)$/gm, '<h2>$1</h2>')
+			// 分隔线
+			.replace(/^---+$/gm, '<hr>')
+			// 粗体 **text**
+			.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+			// 斜体 *text*
+			.replace(/\*(.+?)\*/g, '<em>$1</em>')
+			// 列表项
+			.replace(/^\* (.+)$/gm, '<li>$1</li>')
+			.replace(/^- (.+)$/gm, '<li>$1</li>')
+			.replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>')
+			// 换行
+			.replace(/\n/g, '<br>');
+	}
+	
+	// 流式更新轮询
+	let meetingUpdateInterval = null;
+	let lastSpeechCount = 0;
+	
+	// 显示专家会议弹窗
+	function showExpertMeetingModal(triggerData) {
+		var overlay = document.getElementById('expert-meeting-overlay');
+		var roundInfo = document.getElementById('expert-round-info');
+		var stage = document.getElementById('expert-stage');
+		
+		if (overlay) {
+			overlay.style.display = 'flex';
+			if (roundInfo) {
+				var topic = triggerData.topic || '校园食品安全专家会议';
+				roundInfo.textContent = '会议主题: ' + topic;
+			}
+			
+			// 更新会议内容
+			updateMeetingContent(triggerData);
+			
+			// 如果会议还在进行中，启动轮询获取新内容
+			var status = triggerData.status || 'completed';
+			if (status !== 'completed' && status !== 'error') {
+				startMeetingUpdatePolling();
+			}
+		}
+	}
+	
+	// HTML转义函数
+	function escapeHtml(text) {
+		if (!text) return '';
+		var div = document.createElement('div');
+		div.textContent = text;
+		return div.innerHTML;
+	}
+	
+	// 更新会议内容显示
+	function updateMeetingContent(triggerData) {
+		var stage = document.getElementById('expert-stage');
+		if (!stage) return;
+		
+		var speeches = triggerData.speeches || [];
+		var status = triggerData.status || 'completed';
+		var pendingSpeaker = triggerData.pending_speaker || null;
+		
+		var html = '<div class="expert-speeches">';
+		
+		// 显示已有的发言
+		for (var i = 0; i < speeches.length; i++) {
+			var sp = speeches[i];
+			var speaker = sp.speaker || '未知';
+			var content = sp.content || '';
+			var type = sp.type || 'speech';
+			var role = sp.role || '';
+			
+			// 根据类型设置样式
+			var typeClass = 'speech-item';
+			var typeLabel = '';
+			if (type === 'opening') {
+				typeClass += ' speech-opening';
+				typeLabel = '【开场】';
+			} else if (type === 'question') {
+				typeClass += ' speech-question';
+				typeLabel = '【引导】';
+			} else if (type === 'feedback') {
+				typeClass += ' speech-feedback';
+				var targetExpert = sp.target_expert || '';
+				typeLabel = '【反馈→' + targetExpert + '】';
+			} else if (type === 'advice') {
+				typeClass += ' speech-advice';
+				var targetExpert = sp.target_expert || '';
+				typeLabel = '【意见→' + targetExpert + '】';
+			} else if (type === 'summary') {
+				typeClass += ' speech-summary';
+				typeLabel = '【总结】';
+			} else {
+				typeLabel = '【发言】';
+			}
+			
+			// 角色标签
+			var roleLabel = '';
+			if (role === 'moderator') {
+				roleLabel = '🎤 主持人';
+			} else if (role === 'public_health_expert') {
+				roleLabel = '🏥 公共卫生专家';
+			} else if (role === 'market_supervision_expert') {
+				roleLabel = '📋 市场监管专家';
+			} else if (role === 'education_expert') {
+				roleLabel = '🎓 教育局代表';
+			} else {
+				roleLabel = '👤 ' + speaker;
+			}
+			
+			html += '<div class="' + typeClass + '">';
+			html += '<div class="speech-header">';
+			html += '<span class="speech-role">' + roleLabel + '</span>';
+			html += '<span class="speech-type">' + typeLabel + '</span>';
+			html += '</div>';
+			
+			// 显示思考过程（如果有）
+			if (sp.reasoning && Object.keys(sp.reasoning).length > 0) {
+				var r = sp.reasoning;
+				html += '<details class="reasoning-section">';
+				html += '<summary class="reasoning-toggle">💭 查看思考依据</summary>';
+				html += '<div class="reasoning-content">';
+				if (r.memory) {
+					html += '<div class="reasoning-item"><strong>📝 长期记忆:</strong><pre>' + escapeHtml(r.memory) + '</pre></div>';
+				}
+				if (r.case_knowledge) {
+					html += '<div class="reasoning-item"><strong>📚 案例知识:</strong><pre>' + escapeHtml(r.case_knowledge) + '</pre></div>';
+				}
+				if (r.rules) {
+					html += '<div class="reasoning-item"><strong>📋 规则库:</strong><pre>' + escapeHtml(r.rules) + '</pre></div>';
+				}
+				if (r.public_opinion) {
+					html += '<div class="reasoning-item"><strong>👥 公众舆论:</strong><pre>' + escapeHtml(r.public_opinion) + '</pre></div>';
+				}
+				if (r.web_search) {
+					html += '<div class="reasoning-item"><strong>🌐 网络搜索:</strong><pre>' + escapeHtml(r.web_search) + '</pre></div>';
+				}
+				html += '</div></details>';
+			}
+			
+			html += '<div class="speech-content">' + simpleMarkdown(content) + '</div>';
+			html += '</div>';
+		}
+		
+		// 显示等待提示
+		if (status === 'preparing') {
+			html += '<div class="speech-pending"><span class="pending-dot"></span> 会议准备中...</div>';
+		} else if (status === 'in_progress' && pendingSpeaker) {
+			html += '<div class="speech-pending"><span class="pending-dot"></span> ' + pendingSpeaker + '</div>';
+		} else if (status === 'error') {
+			html += '<div class="speech-error">会议运行出错: ' + (triggerData.error || '未知错误') + '</div>';
+		} else if (status === 'completed') {
+			html += '<div class="speech-completed">✅ 会议已结束</div>';
+			// 停止轮询
+			stopMeetingUpdatePolling();
+		}
+		
+		html += '</div>';
+		stage.innerHTML = html;
+		
+		// 自动滚动到底部
+		stage.scrollTop = stage.scrollHeight;
+	}
+	
+	// 启动会议内容更新轮询
+	function startMeetingUpdatePolling() {
+		if (meetingUpdateInterval) return; // 已经在轮询了
+		
+		meetingUpdateInterval = setInterval(function() {
+			var xobj = new XMLHttpRequest();
+			xobj.overrideMimeType("application/json");
+			xobj.open('GET', "{% url 'check_expert_meeting' %}", true);
+			xobj.onreadystatechange = function() {
+				if (this.readyState === 4 && this.status === 200) {
+					try {
+						var response = JSON.parse(xobj.responseText);
+						if (response.triggered) {
+							updateMeetingContent(response);
+						}
+					} catch(e) {
+						console.error("[Expert Meeting] 解析响应失败:", e);
+					}
+				}
+			};
+			xobj.send(null);
+		}, 1000); // 每1秒更新一次
+	}
+	
+	// 停止会议内容更新轮询
+	function stopMeetingUpdatePolling() {
+		if (meetingUpdateInterval) {
+			clearInterval(meetingUpdateInterval);
+			meetingUpdateInterval = null;
+		}
+	}
+	
+	// 关闭弹窗并删除触发文件
+	function dismissExpertMeeting() {
+		var overlay = document.getElementById('expert-meeting-overlay');
+		if (overlay) {
+			overlay.style.display = 'none';
+		}
+		
+		// 调用后端 API 删除触发文件
+		var xobj = new XMLHttpRequest();
+		xobj.open('GET', "{% url 'dismiss_expert_meeting' %}", true);
+		xobj.onreadystatechange = function() {
+			if (this.readyState === 4) {
+				console.log("[Expert Meeting] 触发文件已删除，下次23:00会重新触发");
+			}
+		};
+		xobj.send();
+	}
+	
+	document.addEventListener('DOMContentLoaded', function() {
+		var closeBtn = document.getElementById('expert-close-btn');
+		
+		if (closeBtn) {
+			closeBtn.addEventListener('click', function() {
+				dismissExpertMeeting();
+			});
+		}
+		
+		// 只能通过×按钮关闭弹窗，点击其他区域不关闭
+		
+		// 启动轮询检查（每3秒检查一次）
+		expertMeetingCheckInterval = setInterval(checkExpertMeetingTrigger, 3000);
+		// 立即检查一次
+		checkExpertMeetingTrigger();
+	});
+	
+	// 页面关闭/刷新时删除触发文件
+	window.addEventListener('beforeunload', function() {
+		// 使用 sendBeacon 确保请求能在页面关闭前发送
+		navigator.sendBeacon("{% url 'dismiss_expert_meeting' %}");
+	});
 </script>
 
 

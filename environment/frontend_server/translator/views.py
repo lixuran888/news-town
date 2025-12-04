@@ -13,6 +13,7 @@ import datetime
 import sys
 from django.shortcuts import render, redirect, HttpResponseRedirect
 from django.http import HttpResponse, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 
 # 添加 global_methods 的路径
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '..', 'generative_agents-main', 'reverie', 'backend_server'))
@@ -418,27 +419,87 @@ def path_tester_update(request):
 
 def expert_meeting_trigger(request):
   """
-  提供专家会议触发文件的API端点
-  当所有专家到达指定位置时，后端会创建触发文件，前端通过此API获取
+  检查专家会议是否触发的API端点
+  后端在23:00创建 temp_storage/expert_meeting_trigger.json，前端轮询此接口
   """
   try:
-    # 使用绝对路径，确保能找到 Reverie 创建的触发文件
-    trigger_file_path = Path(__file__).parent.parent / "expert_meeting_trigger.flag"
+    # 后端 reverie.py 创建的文件路径: temp_storage/expert_meeting_trigger.json
+    trigger_file_path = Path(__file__).parent.parent / "temp_storage" / "expert_meeting_trigger.json"
     
     if trigger_file_path.exists():
+      # 检查文件是否过期（超过1小时自动删除）
+      file_mtime = trigger_file_path.stat().st_mtime
+      file_age_seconds = datetime.datetime.now().timestamp() - file_mtime
+      if file_age_seconds > 3600:  # 1小时 = 3600秒
+        trigger_file_path.unlink()
+        return JsonResponse({"triggered": False, "message": "Old trigger file cleaned up"})
+      
       with open(trigger_file_path, 'r', encoding='utf-8') as f:
         trigger_data = json.load(f)
       
-      # 返回触发数据
-      return JsonResponse(trigger_data)
+      # 返回完整的触发数据（包含speeches、status、pending_speaker）
+      response_data = {
+        "triggered": True,
+        "timestamp": trigger_data.get("timestamp", ""),
+        "action": trigger_data.get("action", "show_expert_conversation"),
+        "topic": trigger_data.get("topic", "校园食品安全专家会议"),
+        "speeches": trigger_data.get("speeches", []),
+        "round_summaries": trigger_data.get("round_summaries", []),
+        "status": trigger_data.get("status", "completed"),
+        "pending_speaker": trigger_data.get("pending_speaker"),
+      }
+      if trigger_data.get("error"):
+        response_data["error"] = trigger_data.get("error")
+      
+      return JsonResponse(response_data)
     else:
-      # 文件不存在，返回404
-      return JsonResponse({"error": "Trigger file not found"}, status=404)
+      # 文件不存在，会议未触发
+      return JsonResponse({"triggered": False})
       
   except Exception as e:
-    return JsonResponse({"error": str(e)}, status=500)
+    return JsonResponse({"triggered": False, "error": str(e)})
 
 
+@csrf_exempt
+def dismiss_expert_meeting(request):
+  """
+  关闭专家会议弹窗时：
+  1. 先把会议内容保存到历史记录文件
+  2. 再删除触发文件
+  支持 GET 和 POST（sendBeacon 用 POST）
+  """
+  try:
+    trigger_file_path = Path(__file__).parent.parent / "temp_storage" / "expert_meeting_trigger.json"
+    history_dir = Path(__file__).parent.parent / "temp_storage" / "expert_meeting_history"
+    
+    if trigger_file_path.exists():
+      # 读取触发文件内容
+      with open(trigger_file_path, 'r', encoding='utf-8') as f:
+        trigger_data = json.load(f)
+      
+      # 如果有实际的会议内容，保存到历史记录
+      if trigger_data.get("speeches"):
+        # 创建历史目录
+        history_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 用时间戳命名历史文件
+        timestamp = trigger_data.get("timestamp", "unknown")
+        # 清理时间戳中的特殊字符
+        safe_timestamp = str(timestamp).replace(":", "-").replace("T", "_")[:19]
+        history_file = history_dir / f"meeting_{safe_timestamp}.json"
+        
+        # 保存历史记录
+        with open(history_file, 'w', encoding='utf-8') as f:
+          json.dump(trigger_data, f, ensure_ascii=False, indent=2)
+      
+      # 删除触发文件
+      trigger_file_path.unlink()
+      return JsonResponse({"success": True, "message": "Meeting saved to history, trigger file deleted"})
+    else:
+      return JsonResponse({"success": True, "message": "File already deleted"})
+      
+  except Exception as e:
+    return JsonResponse({"success": False, "error": str(e)})
 
 
 
