@@ -31,8 +31,104 @@ try:
 except ImportError:
     SENTIMENT_ENABLED = False
 
-def landing(request): 
-  context = {}
+def landing(request):
+  """
+  初始界面：可以设置世界的开始时间
+  """
+  meta_path = "storage/base_the_ville_clean/reverie/meta.json"
+  
+  # 读取当前的 meta.json 配置
+  current_start_date = None
+  current_curr_time = None
+  initial_date_iso = None
+  initial_time_iso = None
+  
+  if os.path.exists(meta_path):
+    try:
+      with open(meta_path, 'r', encoding='utf-8') as f:
+        meta = json.load(f)
+        current_start_date = meta.get("start_date", "")
+        current_curr_time = meta.get("curr_time", "")
+        
+        # 解析日期和时间，用于表单默认值
+        if current_start_date:
+          try:
+            # 解析 "February 13, 2023" 格式
+            dt = datetime.datetime.strptime(current_start_date, "%B %d, %Y")
+            initial_date_iso = dt.strftime("%Y-%m-%d")
+          except:
+            pass
+        
+        if current_curr_time:
+          try:
+            # 解析 "February 13, 2023, 17:00:00" 格式
+            dt = datetime.datetime.strptime(current_curr_time, "%B %d, %Y, %H:%M:%S")
+            initial_time_iso = dt.strftime("%H:%M")
+            if not initial_date_iso:
+              initial_date_iso = dt.strftime("%Y-%m-%d")
+          except:
+            pass
+    except Exception as e:
+      print(f"[landing] Error reading meta.json: {e}")
+  
+  # 处理 POST 请求：保存开始时间
+  if request.method == "POST":
+    error = None
+    message = None
+    
+    try:
+      start_date_str = request.POST.get("start_date", "").strip()
+      start_time_str = request.POST.get("start_time", "00:00").strip()
+      
+      if not start_date_str:
+        error = "请选择开始日期"
+      else:
+        # 解析表单提交的日期时间（YYYY-MM-DD 和 HH:MM 格式）
+        date_part = datetime.datetime.strptime(start_date_str, "%Y-%m-%d")
+        time_part = datetime.datetime.strptime(start_time_str, "%H:%M") if start_time_str else datetime.datetime.strptime("00:00", "%H:%M")
+        
+        # 转换为项目使用的格式
+        formatted_date = date_part.strftime("%B %d, %Y")  # "February 13, 2023"
+        formatted_time = time_part.strftime("%H:%M:%S")   # "17:00:00"
+        formatted_curr_time = f"{formatted_date}, {formatted_time}"
+        
+        # 读取现有的 meta.json
+        if os.path.exists(meta_path):
+          with open(meta_path, 'r', encoding='utf-8') as f:
+            meta = json.load(f)
+        else:
+          meta = {}
+        
+        # 更新日期和时间
+        meta["start_date"] = formatted_date
+        meta["curr_time"] = formatted_curr_time
+        
+        # 写回文件
+        os.makedirs(os.path.dirname(meta_path), exist_ok=True)
+        with open(meta_path, 'w', encoding='utf-8') as f:
+          json.dump(meta, f, indent=2, ensure_ascii=False)
+        
+        message = f"开始时间已更新为 {formatted_date} {formatted_time}。下次运行新仿真时将使用此时间。"
+        current_start_date = formatted_date
+        current_curr_time = formatted_curr_time
+        initial_date_iso = start_date_str
+        initial_time_iso = start_time_str
+        
+    except ValueError as e:
+      error = f"日期时间格式错误：{str(e)}"
+    except Exception as e:
+      error = f"保存失败：{str(e)}"
+      import traceback
+      print(f"[landing] Error saving: {traceback.format_exc()}")
+  
+  context = {
+    "current_start_date": current_start_date,
+    "current_curr_time": current_curr_time,
+    "initial_date_iso": initial_date_iso or "",
+    "initial_time_iso": initial_time_iso or "00:00",
+    "error": error if 'error' in locals() else None,
+    "message": message if 'message' in locals() else None,
+  }
   template = "landing/landing.html"
   return render(request, template, context)
 

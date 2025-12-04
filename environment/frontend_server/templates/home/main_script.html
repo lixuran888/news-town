@@ -431,7 +431,27 @@
 	    // (or some personas might not move if they choose not to). 
 	    // The execute_count_max is computed by tile_width/movement_speed, which
 	    // defines a one step sequence in this world. 
-	    document.getElementById("game-time-content").innerHTML = execute_movement["meta"]["curr_time"];
+	    const currTimeStr = execute_movement["meta"]["curr_time"];
+	    document.getElementById("game-time-content").innerHTML = currTimeStr;
+	    // 根据当前模拟时间字符串切换日/夜滤镜
+	    (function () {
+	      try {
+	        // 假设 curr_time 形如 "February 13, 2023, 21:30:00"
+	        const timeMatch = currTimeStr.match(/(\d{1,2}):\d{2}:\d{2}/);
+	        if (timeMatch) {
+	          const hour = parseInt(timeMatch[1], 10);
+	          if (hour >= 18 || hour < 6) {
+	            document.body.classList.add("night-mode");
+	            document.body.classList.remove("day-mode");
+	          } else {
+	            document.body.classList.add("day-mode");
+	            document.body.classList.remove("night-mode");
+	          }
+	        }
+	      } catch (e) {
+	        // 避免影响主逻辑
+	      }
+	    })();
 	    for (let i=0; i<Object.keys(personas).length; i++) {
 	      let curr_persona_name = Object.keys(personas)[i];
 	      let curr_persona = personas[curr_persona_name];

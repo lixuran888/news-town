@@ -17,3 +17,15 @@ body,
   border-radius: 5px;
 }
 
+/* 夜晚滤镜效果：根据 body 上的 night-mode 类生效（明显变暗，但不偏色） */
+body.night-mode #game-container>canvas {
+  /* 夜晚更明显：亮度再降低一些，颜色仍保持原样 */
+  filter: brightness(0.55) contrast(1.08);
+  transition: filter 0.6s ease-in-out;
+}
+
+body.day-mode #game-container>canvas {
+  filter: none;
+  transition: filter 0.6s ease-in-out;
+}
+

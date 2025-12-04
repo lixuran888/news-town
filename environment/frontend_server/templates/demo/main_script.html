@@ -91,11 +91,27 @@
 	let execute_count = execute_count_max;
 	let movement_target = {};
 	let all_movement = {{ all_movement|safe }};
-
-  let start_datetime =new Date(Date.parse("{{start_datetime}}"));
+	
+  let start_datetime = new Date(Date.parse("{{start_datetime}}"));
   var datetime_options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
- 	document.getElementById("game-time-content").innerHTML = start_datetime.toLocaleTimeString("en-US", datetime_options);
- 	
+  document.getElementById("game-time-content").innerHTML = start_datetime.toLocaleTimeString("en-US", datetime_options);
+
+  // 根据当前时间切换日/夜滤镜
+  function updateSceneFilterByTime(dateObj) {
+    try {
+      const hour = dateObj.getHours();
+      if (hour >= 18 || hour < 6) {
+        document.body.classList.add("night-mode");
+        document.body.classList.remove("day-mode");
+      } else {
+        document.body.classList.add("day-mode");
+        document.body.classList.remove("night-mode");
+      }
+    } catch (e) {
+      // 安全保护：出错时不要影响主逻辑
+    }
+  }
+  updateSceneFilterByTime(start_datetime);
 
 	// ###########################################################################
 	// ENGINE
@@ -485,7 +501,8 @@
 	    step = step + 1;
 
 	    start_datetime = new Date(start_datetime.getTime() + step_size);
- 			document.getElementById("game-time-content").innerHTML = start_datetime.toLocaleTimeString("en-US", datetime_options);
+ 		  document.getElementById("game-time-content").innerHTML = start_datetime.toLocaleTimeString("en-US", datetime_options);
+      updateSceneFilterByTime(start_datetime);
     }
 
 	  execute_count -= 1;
