@@ -913,6 +913,62 @@ def moderator_round_summary(persona,
   return ChatGPT_single_request(prompt)
 
 
+def moderator_summary_with_advice(persona,
+                                   round_num: int,
+                                   round_speeches: List[Dict[str, str]],
+                                   expert_names: List[str],
+                                   expert_roles: List[str],
+                                   topic: str,
+                                   max_rules: int = 3) -> str:
+  """主持人轮次总结 + 对每位专家的意见（合并为一段话）。
+  
+  返回一段话，包含：
+  1. 本轮总结
+  2. 对每位专家的针对性意见
+  """
+  try:
+    name = getattr(persona.scratch, "name", persona.name)
+  except Exception:
+    name = getattr(persona, "name", "Meeting Moderator")
+
+  rules = retrieve_moderator_rules("总结 归纳 建议", top_k=max_rules)
+  rules_block = format_moderator_rules_for_prompt(rules)
+
+  # 格式化本轮发言
+  speeches_text = ""
+  for sp in round_speeches:
+    speeches_text += f"【{sp.get('speaker', '专家')}】:\n{sp.get('content', '')}\n\n"
+
+  # 专家信息
+  expert_info = ""
+  for ename, erole in zip(expert_names, expert_roles):
+    role_desc = {
+      "public_health_expert": "公共卫生专家",
+      "market_supervision_expert": "市场监管专家",
+      "education_expert": "教育局代表"
+    }.get(erole, erole)
+    expert_info += f"- {ename}（{role_desc}）\n"
+
+  prompt = (
+    "你是一名专业的会议主持人，正在主持校园食品安全专家咨询会议。\n"
+    f"第 {round_num} 轮讨论已结束，请进行总结并对每位专家提出意见。\n\n"
+    "【主持人规则库】\n"
+    f"{rules_block}\n\n"
+    "【本轮专家发言】\n"
+    f"{speeches_text}\n"
+    "【与会专家】\n"
+    f"{expert_info}\n"
+    "【会议主题】\n"
+    f"{topic.strip()}\n\n"
+    f"请以 {name} 的身份，用一段连贯的话完成以下内容：\n"
+    "1. 首先总结本轮讨论的核心观点和共识（2-3句）。\n"
+    "2. 然后依次对每位专家提出简短的针对性意见（每人1-2句），指出下一轮应聚焦的方向。\n"
+    "3. 最后提出下一轮的引导性问题。\n"
+    "4. 整体控制在300字以内，语气专业简洁。\n"
+  )
+  return ChatGPT_single_request(prompt)
+
+
 def write_meeting_memory(persona,
                           content: str,
                           memory_type: str,
@@ -1262,10 +1318,20 @@ class ExpertMeeting:
       return ""
 
     next_name = getattr(next_expert.scratch, "name", next_expert.name)
+    
+    # 传入上一轮的总结和发言，而不是当前轮（当前轮是空的）
+    previous_round_speeches = []
+    if self.round_summaries:
+      # 构造上一轮总结作为参考
+      previous_round_speeches = [{
+        "speaker": "主持人",
+        "content": self.round_summaries[-1]
+      }]
+    
     question = moderator_question_speech(
       self.moderator,
       self.current_round,
-      self.round_speeches,
+      previous_round_speeches,
       next_name,
       self.topic
     )
@@ -1508,12 +1574,11 @@ class ExpertMeeting:
   def run_full_round_streaming(self, on_speech_callback, use_dynamic_order: bool = True) -> List[Dict[str, str]]:
     """运行完整的一轮讨论（流式版本，每生成一条发言就回调更新）。
     
-    新流程：
+    流程：
     1. 主持人决定顺序
-    2. 主持人简短引导
-    3. 专家A发言 → 专家B发言 → 专家C发言（连续发言）
-    4. 主持人总结（写入所有专家记忆）
-    5. 主持人对专家A意见 → 对专家B意见 → 对专家C意见
+    2. 主持人简短引导（第2轮+）
+    3. 专家A发言 → 专家B发言 → 专家C发言
+    4. 主持人总结+对各专家意见（合并为一段话）
     
     Args:
       on_speech_callback: 回调函数 (speeches, status, pending_speaker) -> None

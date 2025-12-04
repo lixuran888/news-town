@@ -645,6 +645,9 @@
 				roundInfo.textContent = '会议主题: ' + topic;
 			}
 			
+			// 重置发言计数，确保首次完整渲染
+			lastSpeechCount = 0;
+			
 			// 更新会议内容
 			updateMeetingContent(triggerData);
 			
@@ -664,7 +667,7 @@
 		return div.innerHTML;
 	}
 	
-	// 更新会议内容显示
+	// 更新会议内容显示（增量更新，避免闪烁）
 	function updateMeetingContent(triggerData) {
 		var stage = document.getElementById('expert-stage');
 		if (!stage) return;
@@ -673,15 +676,48 @@
 		var status = triggerData.status || 'completed';
 		var pendingSpeaker = triggerData.pending_speaker || null;
 		
+		// 检查是否需要更新发言内容（只有发言数量变化时才更新）
+		var needUpdateSpeeches = (speeches.length !== lastSpeechCount);
+		
+		// 如果不需要更新发言，只更新状态提示
+		if (!needUpdateSpeeches) {
+			var statusDiv = document.getElementById('meeting-status-indicator');
+			if (statusDiv) {
+				var statusHtml = '';
+				if (status === 'preparing') {
+					statusHtml = '<span class="pending-dot"></span> 会议准备中...';
+				} else if (status === 'in_progress' && pendingSpeaker) {
+					statusHtml = '<span class="pending-dot"></span> ' + pendingSpeaker;
+				} else if (status === 'error') {
+					statusHtml = '会议运行出错: ' + (triggerData.error || '未知错误');
+					statusDiv.className = 'speech-error';
+				} else if (status === 'completed') {
+					statusHtml = '✅ 会议已结束';
+					statusDiv.className = 'speech-completed';
+					stopMeetingUpdatePolling();
+				}
+				statusDiv.innerHTML = statusHtml;
+			}
+			return;
+		}
+		
+		// 发言数量变化，需要完整更新
+		lastSpeechCount = speeches.length;
+		
 		var html = '<div class="expert-speeches">';
 		
-		// 显示已有的发言
+		// 显示已有的发言（summary 和 advice 合并显示）
 		for (var i = 0; i < speeches.length; i++) {
 			var sp = speeches[i];
 			var speaker = sp.speaker || '未知';
 			var content = sp.content || '';
 			var type = sp.type || 'speech';
 			var role = sp.role || '';
+			
+			// 跳过 advice，它会和 summary 合并显示
+			if (type === 'advice') {
+				continue;
+			}
 			
 			// 根据类型设置样式
 			var typeClass = 'speech-item';
@@ -696,13 +732,9 @@
 				typeClass += ' speech-feedback';
 				var targetExpert = sp.target_expert || '';
 				typeLabel = '【反馈→' + targetExpert + '】';
-			} else if (type === 'advice') {
-				typeClass += ' speech-advice';
-				var targetExpert = sp.target_expert || '';
-				typeLabel = '【意见→' + targetExpert + '】';
 			} else if (type === 'summary') {
 				typeClass += ' speech-summary';
-				typeLabel = '【总结】';
+				typeLabel = '【总结与意见】';
 			} else {
 				typeLabel = '【发言】';
 			}
@@ -751,21 +783,38 @@
 				html += '</div></details>';
 			}
 			
-			html += '<div class="speech-content">' + simpleMarkdown(content) + '</div>';
+			// 如果是 summary，收集后续的 advice 一起显示
+			var fullContent = content;
+			if (type === 'summary') {
+				// 查找后续的 advice
+				for (var j = i + 1; j < speeches.length; j++) {
+					if (speeches[j].type === 'advice') {
+						var targetExpert = speeches[j].target_expert || '专家';
+						fullContent += '\n\n**对' + targetExpert + '的意见：**\n' + speeches[j].content;
+					} else {
+						break; // 遇到非 advice 就停止
+					}
+				}
+			}
+			
+			html += '<div class="speech-content">' + simpleMarkdown(fullContent) + '</div>';
 			html += '</div>';
 		}
 		
-		// 显示等待提示
+		// 显示等待提示（使用固定 id，方便增量更新）
 		if (status === 'preparing') {
-			html += '<div class="speech-pending"><span class="pending-dot"></span> 会议准备中...</div>';
+			html += '<div id="meeting-status-indicator" class="speech-pending"><span class="pending-dot"></span> 会议准备中...</div>';
 		} else if (status === 'in_progress' && pendingSpeaker) {
-			html += '<div class="speech-pending"><span class="pending-dot"></span> ' + pendingSpeaker + '</div>';
+			html += '<div id="meeting-status-indicator" class="speech-pending"><span class="pending-dot"></span> ' + pendingSpeaker + '</div>';
 		} else if (status === 'error') {
-			html += '<div class="speech-error">会议运行出错: ' + (triggerData.error || '未知错误') + '</div>';
+			html += '<div id="meeting-status-indicator" class="speech-error">会议运行出错: ' + (triggerData.error || '未知错误') + '</div>';
 		} else if (status === 'completed') {
-			html += '<div class="speech-completed">✅ 会议已结束</div>';
+			html += '<div id="meeting-status-indicator" class="speech-completed">✅ 会议已结束</div>';
 			// 停止轮询
 			stopMeetingUpdatePolling();
+		} else {
+			// 默认状态占位符
+			html += '<div id="meeting-status-indicator" class="speech-pending"></div>';
 		}
 		
 		html += '</div>';

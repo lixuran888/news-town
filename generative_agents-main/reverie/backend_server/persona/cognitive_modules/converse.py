@@ -123,25 +123,18 @@ def generate_one_utterance(maze, init_persona, target_persona, retrieved, curr_c
               f"is initiating a conversation with " +
               f"{target_persona.scratch.name}.")
 
-  print ("July 23 5")
   x = run_gpt_generate_iterative_chat_utt(maze, init_persona, target_persona, retrieved, curr_context, curr_chat)[0]
-
-  print ("July 23 6")
-
-  print ("adshfoa;khdf;fajslkfjald;sdfa HERE", x)
 
   return x["utterance"], x["end"]
 
 def agent_chat_v2(maze, init_persona, target_persona): 
   curr_chat = []  # [[speaker, utterance], ...]
   curr_chat_with_sentiment = []  # [[speaker, utterance, sentiment_info], ...]
-  print ("July 23")
 
   for i in range(8): 
     focal_points = [f"{target_persona.scratch.name}"]
     retrieved = new_retrieve(init_persona, focal_points, 50)
     relationship = generate_summarize_agent_relationship(init_persona, target_persona, retrieved)
-    print ("-------- relationshopadsjfhkalsdjf", relationship)
     last_chat = ""
     for i in curr_chat[-4:]:
       last_chat += ": ".join(i) + "\n"
@@ -200,7 +193,6 @@ def agent_chat_v2(maze, init_persona, target_persona):
       break
 
   # 输出对话和情感汇总
-  print ("July 23 PU")
   print ("=" * 60)
   print ("[对话记录 with 情感标签]")
   for row in curr_chat_with_sentiment: 
@@ -220,7 +212,6 @@ def agent_chat_v2(maze, init_persona, target_persona):
     print (f"  平均情感分: {summary['average_score']:+.3f}")
     print (f"  情感趋势: {summary['sentiment_trend']}")
   print ("=" * 60)
-  print ("July 23 FIN")
 
   # 返回对话，直接在文本中加入情感标签
   # 格式: [[speaker, "utterance [😊positive]"], ...]
