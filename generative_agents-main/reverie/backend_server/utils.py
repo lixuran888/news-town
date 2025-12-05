@@ -6,7 +6,7 @@
 deepseek_api_key = "sk-1425a2c9096645888105644b7db582d9"
 
 # Tavily API Key for web search (专家联网搜索)
-tavily_api_key = ""  # 请填入你的 Tavily API Key
+tavily_api_key = "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"  # 请填入你的 Tavily API Key
 
 # Put your name
 key_owner = "lixuran"

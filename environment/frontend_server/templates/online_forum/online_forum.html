@@ -1,0 +1,368 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📱 线上舆论广场</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .forum-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #0f0f23;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+
+        .forum-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            text-align: center;
+        }
+
+        .forum-header h1 {
+            color: white;
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .forum-header .subtitle {
+            color: rgba(255,255,255,0.8);
+            font-size: 14px;
+        }
+
+        .forum-stats {
+            display: flex;
+            justify-content: space-around;
+            padding: 15px;
+            background: #1a1a2e;
+            border-bottom: 1px solid #333;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            color: #667eea;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 12px;
+        }
+
+        .posts-container {
+            max-height: 500px;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .posts-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .posts-container::-webkit-scrollbar-track {
+            background: #1a1a2e;
+        }
+
+        .posts-container::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 4px;
+        }
+
+        .post-item {
+            background: #1a1a2e;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 3px solid #667eea;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .post-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .post-author {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .author-avatar {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .author-info .online-name {
+            color: #667eea;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .author-info .real-name {
+            color: #666;
+            font-size: 12px;
+        }
+
+        .post-time {
+            color: #666;
+            font-size: 12px;
+        }
+
+        .post-content {
+            color: #e0e0e0;
+            font-size: 14px;
+            line-height: 1.6;
+            padding: 10px 0;
+        }
+
+        .post-topic {
+            display: inline-block;
+            background: rgba(102, 126, 234, 0.2);
+            color: #667eea;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
+        .no-posts {
+            text-align: center;
+            color: #666;
+            padding: 40px;
+        }
+
+        .no-posts .icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .refresh-btn {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .refresh-btn:hover {
+            opacity: 0.9;
+        }
+
+        .loading {
+            text-align: center;
+            color: #667eea;
+            padding: 20px;
+        }
+
+        .loading .spinner {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* 返回按钮 */
+        .back-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(102, 126, 234, 0.9);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            z-index: 100;
+        }
+
+        .back-btn:hover {
+            background: #764ba2;
+        }
+    </style>
+</head>
+<body>
+    <a href="/" class="back-btn">← 返回地图</a>
+
+    <div class="forum-container">
+        <div class="forum-header">
+            <h1>📱 线上舆论广场</h1>
+            <div class="subtitle">居民们的社交媒体发言</div>
+        </div>
+
+        <div class="forum-stats">
+            <div class="stat-item">
+                <div class="stat-number" id="postCount">0</div>
+                <div class="stat-label">总发言数</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="activeUsers">0</div>
+                <div class="stat-label">活跃用户</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="lastUpdate">--</div>
+                <div class="stat-label">最后更新</div>
+            </div>
+        </div>
+
+        <div class="posts-container" id="postsContainer">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>加载中...</p>
+            </div>
+        </div>
+
+        <button class="refresh-btn" onclick="loadPosts()">🔄 刷新</button>
+    </div>
+
+    <script>
+        // 模拟时间相关
+        let simCode = '{{ sim_code|default:"" }}';
+        
+        // 角色头像 emoji 映射
+        const avatarMap = {
+            '王丽华': '☕',
+            '高建国': '🛵',
+            '林小雨': '🌸',
+            '李大强': '💪',
+            '陈思远': '🎙️',
+            '周小艺': '🎨',
+            '韩小雪': '📚',
+            '张国庆': '🚕',
+            '刘小敏': '🍳'
+        };
+
+        // 加载帖子
+        async function loadPosts() {
+            const container = document.getElementById('postsContainer');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><p>加载中...</p></div>';
+
+            try {
+                const response = await fetch('/get_online_posts/');
+                if (!response.ok) throw new Error('加载失败');
+                
+                const data = await response.json();
+                displayPosts(data.posts || []);
+                updateStats(data);
+            } catch (error) {
+                console.error('加载失败:', error);
+                container.innerHTML = `
+                    <div class="no-posts">
+                        <div class="icon">📭</div>
+                        <p>暂无发言或加载失败</p>
+                        <p style="font-size:12px;margin-top:10px;">点击刷新重试</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 显示帖子
+        function displayPosts(posts) {
+            const container = document.getElementById('postsContainer');
+            
+            if (!posts || posts.length === 0) {
+                container.innerHTML = `
+                    <div class="no-posts">
+                        <div class="icon">🤫</div>
+                        <p>还没有人发言</p>
+                        <p style="font-size:12px;margin-top:10px;">等待居民们刷手机...</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // 按时间倒序排列（最新的在前）
+            posts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            container.innerHTML = posts.map(post => `
+                <div class="post-item">
+                    <div class="post-header">
+                        <div class="post-author">
+                            <div class="author-avatar">${avatarMap[post.real_name] || '👤'}</div>
+                            <div class="author-info">
+                                <div class="online-name">${post.online_name || '匿名用户'}</div>
+                                <div class="real-name">${post.real_name || ''}</div>
+                            </div>
+                        </div>
+                        <div class="post-time">${formatTime(post.timestamp)}</div>
+                    </div>
+                    <div class="post-content">${post.content}</div>
+                    ${post.topic ? `<span class="post-topic">#${post.topic}</span>` : ''}
+                </div>
+            `).join('');
+        }
+
+        // 更新统计
+        function updateStats(data) {
+            document.getElementById('postCount').textContent = data.total || 0;
+            
+            // 计算活跃用户数
+            const uniqueUsers = new Set((data.posts || []).map(p => p.real_name));
+            document.getElementById('activeUsers').textContent = uniqueUsers.size;
+            
+            // 最后更新时间
+            if (data.posts && data.posts.length > 0) {
+                const latest = data.posts[data.posts.length - 1];
+                document.getElementById('lastUpdate').textContent = formatTime(latest.timestamp, true);
+            }
+        }
+
+        // 格式化时间
+        function formatTime(timestamp, short = false) {
+            if (!timestamp) return '--';
+            const date = new Date(timestamp);
+            if (short) {
+                return `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+            }
+            return `${date.getMonth()+1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+        }
+
+        // 自动刷新（每30秒）
+        setInterval(loadPosts, 30000);
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', loadPosts);
+    </script>
+</body>
+</html>

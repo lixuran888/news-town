@@ -598,6 +598,106 @@ def dismiss_expert_meeting(request):
     return JsonResponse({"success": False, "error": str(e)})
 
 
+# ============================================================================
+# 线上舆论 API
+# ============================================================================
+
+def online_forum(request):
+  """线上舆论广场页面"""
+  context = {
+    "sim_code": request.GET.get("sim_code", "")
+  }
+  return render(request, "online_forum/online_forum.html", context)
 
 
+def get_online_posts(request):
+  """获取线上舆论帖子"""
+  try:
+    # 尝试从当前运行的 simulation 读取
+    sim_code = request.GET.get("sim_code", "")
+    
+    # 构建可能的路径
+    paths_to_try = []
+    
+    if sim_code:
+      paths_to_try.append(f"storage/{sim_code}/online_opinions/posts.json")
+    
+    # 默认路径
+    paths_to_try.append("storage/base_the_ville_clean/online_opinions/posts.json")
+    
+    posts_data = None
+    for path in paths_to_try:
+      if os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
+          posts_data = json.load(f)
+        break
+    
+    if posts_data is None:
+      return JsonResponse({
+        "posts": [],
+        "total": 0,
+        "message": "舆论库尚未创建"
+      })
+    
+    return JsonResponse({
+      "posts": posts_data.get("posts", []),
+      "total": len(posts_data.get("posts", [])),
+      "metadata": posts_data.get("metadata", {})
+    })
+    
+  except Exception as e:
+    return JsonResponse({
+      "posts": [],
+      "total": 0,
+      "error": str(e)
+    })
+
+
+@csrf_exempt
+def post_online_opinion(request):
+  """发表线上舆论（测试用）"""
+  if request.method != "POST":
+    return JsonResponse({"error": "仅支持 POST 请求"}, status=405)
+  
+  try:
+    data = json.loads(request.body)
+    
+    online_name = data.get("online_name", "匿名用户")
+    real_name = data.get("real_name", "")
+    content = data.get("content", "")
+    
+    if not content:
+      return JsonResponse({"error": "内容不能为空"}, status=400)
+    
+    # 读取现有帖子
+    path = "storage/base_the_ville_clean/online_opinions/posts.json"
+    
+    if os.path.exists(path):
+      with open(path, 'r', encoding='utf-8') as f:
+        posts_data = json.load(f)
+    else:
+      posts_data = {"posts": [], "metadata": {}}
+    
+    # 创建新帖子
+    new_post = {
+      "id": len(posts_data["posts"]) + 1,
+      "online_name": online_name,
+      "real_name": real_name,
+      "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+      "content": content,
+      "topic": "幼儿园食物中毒事件"
+    }
+    
+    posts_data["posts"].append(new_post)
+    posts_data["metadata"]["total_posts"] = len(posts_data["posts"])
+    
+    # 保存
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+      json.dump(posts_data, f, ensure_ascii=False, indent=2)
+    
+    return JsonResponse({"success": True, "post": new_post})
+    
+  except Exception as e:
+    return JsonResponse({"error": str(e)}, status=500)
 

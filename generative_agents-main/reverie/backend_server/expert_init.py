@@ -4,6 +4,7 @@ from typing import Dict, Iterable, List, Set
 from persona.prompt_template.gpt_structure import ChatGPT_single_request, get_embedding
 from persona.prompt_template.run_gpt_prompt import run_gpt_prompt_public_opinion
 from persona.cognitive_modules.retrieve import new_retrieve
+from persona.cognitive_modules.phone_browsing import get_online_opinions_for_experts
 from domain_knowledge.food_poisoning_knowledge import retrieve_food_poisoning_knowledge
 from domain_knowledge.food_safety_rules import (
   retrieve_food_safety_rules,
@@ -310,22 +311,41 @@ def _format_memory_nodes_for_prompt(nodes: List["ConceptNode"]) -> str:
 
 
 def _format_public_opinion_from_nodes(nodes: List["ConceptNode"],
-                                      max_public_opinion: int) -> str:
-  if not nodes:
-    return "(当前尚未形成明确的公众舆论摘要，或尚未写入专家记忆)"
-
-  filtered: List["ConceptNode"] = []
-  for n in nodes:
-    kws = {str(k).lower() for k in getattr(n, "keywords", set())}
-    if kws.intersection({k.lower() for k in PUBLIC_OPINION_KEYWORDS}):
-      filtered.append(n)
-  if not filtered:
-    return "(当前尚未形成明确的公众舆论摘要，或尚未写入专家记忆)"
-
-  filtered = filtered[:max_public_opinion]
+                                      max_public_opinion: int,
+                                      sim_folder: str = None,
+                                      curr_time: datetime.datetime = None) -> str:
+  """格式化公众舆论，包括线下对话和线上发言"""
   parts: List[str] = []
-  for n in filtered:
-    parts.append(str(n.description))
+  
+  # 1. 线下舆论（从记忆节点中提取）
+  if nodes:
+    filtered: List["ConceptNode"] = []
+    for n in nodes:
+      kws = {str(k).lower() for k in getattr(n, "keywords", set())}
+      if kws.intersection({k.lower() for k in PUBLIC_OPINION_KEYWORDS}):
+        filtered.append(n)
+    
+    if filtered:
+      parts.append("【线下舆论】")
+      for n in filtered[:max_public_opinion]:
+        parts.append(str(n.description))
+  
+  # 2. 线上舆论（从舆论库中读取）
+  try:
+    online_opinions = get_online_opinions_for_experts(
+      since_hours=24,
+      sim_folder=sim_folder,
+      curr_time=curr_time
+    )
+    if online_opinions and "没有网民发言" not in online_opinions:
+      parts.append("\n【线上舆论】")
+      parts.append(online_opinions)
+  except Exception as e:
+    print(f"[Expert] 读取线上舆论失败: {e}")
+  
+  if not parts:
+    return "(当前尚未形成明确的公众舆论摘要)"
+  
   return "\n".join(parts)
 
 
@@ -374,6 +394,7 @@ def expert_meeting_speech(persona,
   opinion_block = _format_public_opinion_from_nodes(
     memory_nodes,
     max_public_opinion=max_public_opinion,
+    curr_time=meeting_time,
   )
 
   # Tavily 联网搜索：获取最新的公共卫生/食品安全相关信息
@@ -457,7 +478,7 @@ def market_supervision_expert_meeting_speech(persona,
   rules = retrieve_market_supervision_rules(question, top_k=max_rules)
   rules_block = format_market_supervision_rules_for_prompt(rules)
 
-  opinion_block = _format_public_opinion_from_nodes(memory_nodes, max_public_opinion)
+  opinion_block = _format_public_opinion_from_nodes(memory_nodes, max_public_opinion, curr_time=meeting_time)
 
   # Tavily 联网搜索：获取最新的市场监管相关信息
   web_query = f"市场监管 食品安全 学校食堂 {question[:50]}"
@@ -539,7 +560,7 @@ def education_expert_meeting_speech(persona,
   rules = retrieve_education_rules(question, top_k=max_rules)
   rules_block = format_education_rules_for_prompt(rules)
 
-  opinion_block = _format_public_opinion_from_nodes(memory_nodes, max_public_opinion)
+  opinion_block = _format_public_opinion_from_nodes(memory_nodes, max_public_opinion, curr_time=meeting_time)
 
   # Tavily 联网搜索：获取最新的校园安全/教育管理相关信息
   web_query = f"教育局 学校食堂管理 校园安全 {question[:50]}"
@@ -660,7 +681,7 @@ def moderator_opening_speech(persona,
   rules = retrieve_moderator_rules(topic, top_k=max_rules)
   rules_block = format_moderator_rules_for_prompt(rules)
 
-  opinion_block = _format_public_opinion_from_nodes(memory_nodes, max_public_opinion=1)
+  opinion_block = _format_public_opinion_from_nodes(memory_nodes, max_public_opinion=1, curr_time=meeting_time)
 
   experts_str = "、".join(expert_names) if expert_names else "各位专家"
   first_expert_hint = f"\n\n【首位发言专家】\n{first_expert_name}" if first_expert_name else ""
@@ -930,7 +951,7 @@ def moderator_round_summary(persona,
   memory_block = _format_memory_nodes_for_prompt(memory_nodes)
   
   # 检索公众舆论（从平民对话中收集）
-  opinion_block = _format_public_opinion_from_nodes(memory_nodes, max_public_opinion)
+  opinion_block = _format_public_opinion_from_nodes(memory_nodes, max_public_opinion, curr_time=meeting_time)
 
   rules = retrieve_moderator_rules("总结 归纳 共识", top_k=max_rules)
   rules_block = format_moderator_rules_for_prompt(rules)
@@ -1009,7 +1030,7 @@ def moderator_final_summary_and_decision(persona,
   memory_block = _format_memory_nodes_for_prompt(memory_nodes)
   
   # 公众舆论
-  opinion_block = _format_public_opinion_from_nodes(memory_nodes, max_public_opinion=1)
+  opinion_block = _format_public_opinion_from_nodes(memory_nodes, max_public_opinion=1, curr_time=meeting_time)
 
   rules = retrieve_moderator_rules("总结 决策 结论", top_k=max_rules)
   rules_block = format_moderator_rules_for_prompt(rules)

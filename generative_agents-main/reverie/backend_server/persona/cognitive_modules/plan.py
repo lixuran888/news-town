@@ -15,6 +15,9 @@ from global_methods import *
 from persona.prompt_template.run_gpt_prompt import *
 from persona.cognitive_modules.retrieve import *
 from persona.cognitive_modules.converse import *
+from persona.cognitive_modules.phone_browsing import (
+    browse_phone, should_browse_phone, PHONE_USAGE_CONFIG
+)
 
 ##############################################################################
 # CHAPTER 2: Generate
@@ -42,7 +45,7 @@ def generate_wake_up_hour(persona):
   # they do not sleep too late into the morning. This keeps the world more
   # active and creates a longer window for encounters and conversations.
   name = getattr(persona.scratch, "name", persona.name)
-  early_risers = {"Isabella Rodriguez", "Maria Lopez", "Klaus Mueller"}
+  early_risers = {"王丽华", "林小雨", "高建国", "李大强", "陈思远", "周小艺", "韩小雪", "张国庆", "刘小敏"}
   if name in early_risers:
     # Ensure they wake up no later than 7am, but never before 5am to avoid
     # unrealistic schedules if the model outputs extreme values.
@@ -241,8 +244,8 @@ def generate_action_sector(act_desp, persona, maze):
   # 对于三位学生人物，当日程文本本身已经明显指向某类地点时，
   # 在这里做一层本地规则，尽量减少 GPT 对地点判断的影响。
   name = getattr(persona.scratch, "name", persona.name)
-  student_set = {"Isabella Rodriguez", "Maria Lopez", "Klaus Mueller"}
-  if name in student_set:
+  civilian_set = {"王丽华", "林小雨", "高建国", "李大强", "陈思远", "周小艺", "韩小雪", "张国庆", "刘小敏"}
+  if name in civilian_set:
     # 睡觉 / 上床 → 学生宿舍
     if ("sleep" in text) or ("in bed" in text):
       return "Dorm for Oak Hill College"
@@ -303,13 +306,21 @@ def generate_action_arena(act_desp, persona, maze, act_world, act_sector):
   # 绑定到各自的房间，避免模型把睡觉安排在 garden / common room。
   text = act_desp.lower()
   name = getattr(persona.scratch, "name", persona.name)
+  # 平民角色睡觉时返回各自房间
+  civilian_rooms = {
+    "王丽华": "王丽华的公寓",
+    "高建国": "高建国的房间",
+    "林小雨": "林小雨的房间",
+    "李大强": "李大强家",
+    "陈思远": "陈思远的房间",
+    "周小艺": "周小艺的房间",
+    "韩小雪": "韩小雪家",
+    "张国庆": "张国庆的房间",
+    "刘小敏": "刘小敏的房间",
+  }
   if ("sleep" in text) or ("in bed" in text):
-    if name == "Klaus Mueller":
-      return "Klaus Mueller's room"
-    if name == "Maria Lopez":
-      return "Maria Lopez's room"
-    if name == "Isabella Rodriguez":
-      return "Isabella Rodriguez's room"
+    if name in civilian_rooms:
+      return civilian_rooms[name]
 
   result = run_gpt_prompt_action_arena(act_desp, persona, maze, act_world, act_sector)
   if result is None or result[0] is None:
@@ -648,7 +659,8 @@ def _seed_public_health_expert_food_poisoning_memory(persona):
 
 def _seed_civilians_food_poisoning_news_memory(persona):
   name = getattr(persona.scratch, "name", persona.name)
-  if name not in {"Isabella Rodriguez", "Klaus Mueller", "Maria Lopez"}:
+  civilian_names = {"王丽华", "高建国", "林小雨", "李大强", "陈思远", "周小艺", "韩小雪", "张国庆", "刘小敏"}
+  if name not in civilian_names:
     return
   if getattr(persona.scratch, "_seeded_food_poisoning_news", False):
     return
@@ -657,10 +669,10 @@ def _seed_civilians_food_poisoning_news_memory(persona):
   expiration = created + datetime.timedelta(days=365)
   s = persona.scratch.name
   p = "news"
-  o = "food_poisoning_tianshui_kindergarten"
+  o = "food_poisoning_kindergarten"
 
   def _add_thought(text, extra_keywords=None, poignancy=7):
-    base_keywords = {"food_poisoning", "news", "kindergarten", "lead"}
+    base_keywords = {"food_poisoning", "news", "kindergarten", "children"}
     if extra_keywords:
       base_keywords.update(extra_keywords)
     keywords = set(base_keywords)
@@ -679,40 +691,59 @@ def _seed_civilians_food_poisoning_news_memory(persona):
       None,
     )
 
-  if name == "Isabella Rodriguez":
+  if name == "王丽华":
     _add_thought(
-      "最近有新闻说，甘肃天水的一所幼儿园因为在孩子吃的糕点里加了工业彩绘颜料，导致很多幼儿血铅异常。我一想到那家园子的餐食也是每天像我们咖啡馆一样端到孩子面前，就觉得后背发凉。",
-      extra_keywords={"cafe", "customers", "parents"},
+      "阳光幼儿园的食物中毒事件让我非常震惊！孩子才这么小，怎么能出这种事？我在咖啡馆听到好多家长和老师在讨论这件事，大家都很担心。",
+      extra_keywords={"cafe", "gossip", "parents"},
       poignancy=7,
     )
+  elif name == "高建国":
     _add_thought(
-      "看到那起幼儿园食物中毒事件后，我开始更加留意 Hobbs Cafe 的食材来源和卫生细节，也会和学生和家长聊起这件事，希望他们在这里至少能感觉到安全和被照顾。",
-      extra_keywords={"hobbs", "hygiene", "safety"},
-      poignancy=6,
-    )
-
-  if name == "Klaus Mueller":
-    _add_thought(
-      "我在新闻里看到了甘肃天水那家幼儿园的铅中毒事件，孩子们只是吃了看起来更好看的点心，却被迫承担制度和监管失灵的代价，这让我再次意识到弱势群体在公共决策中的话语有多么微弱。",
-      extra_keywords={"social_justice", "inequality"},
+      "幼儿园食物中毒事件又一次证明了这系统烂透了，谁在乎孩子？他们只在乎赚钱。那些监管部门都是摆设！",
+      extra_keywords={"system", "anger", "criticism"},
       poignancy=8,
     )
+  elif name == "林小雨":
     _add_thought(
-      "那起幼儿园食物中毒事件中，园长、监管部门、检测机构之间互相推诿的报道，让我想到自己关于绅士化和结构性不公的研究：当制度优先考虑效率和面子时，受伤的总是那些没有议价能力的人。",
-      extra_keywords={"research", "gentrification"},
+      "作为阳光幼儿园的老师，食物中毒事件让我心痛不已。那些孩子我每天都在照顾，看到他们生病我真的很难受。最重要的是孩子先安全、先好起来。",
+      extra_keywords={"teacher", "care", "children"},
+      poignancy=9,
+    )
+  elif name == "李大强":
+    _add_thought(
+      "我孩子在医院躺着，你们跟我讲程序？讲流程？我不管什么流程，我要结果！这次绝对不能就这么算了！",
+      extra_keywords={"parent", "anger", "hospital"},
+      poignancy=10,
+    )
+  elif name == "陈思远":
+    _add_thought(
+      "幼儿园食物中毒事件不仅是一场意外，它折射的是我们到底把儿童安全放在什么位置。我想在播客里深入讨论这个问题。",
+      extra_keywords={"podcast", "analysis", "institution"},
       poignancy=7,
     )
-
-  if name == "Maria Lopez":
+  elif name == "周小艺":
     _add_thought(
-      "刷社交媒体的时候，我看到好多关于甘肃天水一所幼儿园食物中毒的帖子和视频，孩子们因为工业颜料导致血铅超标，评论区全是愤怒和心碎的表情，我一边看一边觉得很难受。",
-      extra_keywords={"social_media", "stream", "emotion"},
-      poignancy=7,
-    )
-    _add_thought(
-      "我在直播时也提到那起幼儿园食物中毒事件，弹幕里有人说这是监管问题，有人说是资本逐利害的，又有人说不要传播负面情绪。我意识到，哪怕是在游戏直播里，大家也会带着对现实世界不安全感的情绪进来。",
-      extra_keywords={"twitch", "chat", "audience"},
+      "大家都在怕，可是谁都不知道下一步该怎么办。我画了一幅空荡荡的幼儿园滑梯，试图表达这种无力感。",
+      extra_keywords={"art", "observation", "emotion"},
       poignancy=6,
+    )
+  elif name == "韩小雪":
+    _add_thought(
+      "那个食堂……我以前也在那吃饭的。听说有小朋友中毒了，那些小孩比我小时候还小，他们什么都不懂。",
+      extra_keywords={"former_student", "memory", "concern"},
+      poignancy=7,
+    )
+  elif name == "张国庆":
+    _add_thought(
+      "我这几天拉的家长，一个比一个憔悴。每个人都在讲自己的孩子，我听着都揪心。",
+      extra_keywords={"taxi", "stories", "sympathy"},
+      poignancy=6,
+    )
+  elif name == "刘小敏":
+    _add_thought(
+      "我看见了……那天……那个供应商送来的菜，颜色就不太对。我当时想说，但厨师长说没事。如果我当时坚持说出来，是不是就不会这样……",
+      extra_keywords={"witness", "guilt", "secret"},
+      poignancy=10,
     )
 
   persona.scratch._seeded_food_poisoning_news = True
@@ -817,30 +848,31 @@ def _long_term_planning(persona, new_day):
     return compressed or schedule
 
   name = getattr(persona.scratch, "name", persona.name)
-  meeting_personas = {"Isabella Rodriguez", "Maria Lopez", "Klaus Mueller"}
-  if name in meeting_personas:
+  civilian_personas = {"王丽华", "林小雨", "高建国", "李大强", "陈思远", "周小艺", "韩小雪", "张国庆", "刘小敏"}
+  if name in civilian_personas:
     sched = persona.scratch.f_daily_schedule
-    # Breakfast: 8:009:00 (48060 minutes)
+    # Breakfast: 8:00–9:00 (480–540 minutes)
     sched = _override_window(
       sched,
       8 * 60,
       9 * 60,
-      f"having breakfast and chatting at the campus cafe",
+      f"在老街咖啡馆吃早餐和聊天",
     )
-    # Lunch: 12:0013:00 (720780 minutes)
+    # Lunch: 12:00–13:00 (720–780 minutes)
     sched = _override_window(
       sched,
       12 * 60,
       13 * 60,
-      f"having lunch together at the campus cafeteria",
+      f"在社区食堂吃午饭",
     )
-    # Evening: 19:0020:00 (11401200 minutes)
+    # Evening: 19:00–20:00 (1140–1200 minutes)
     sched = _override_window(
       sched,
       19 * 60,
       20 * 60,
-      f"relaxing and talking with friends at the town square",
+      f"在公园或咖啡馆和朋友聊天放松",
     )
+    
     persona.scratch.f_daily_schedule = sched
 
   persona.scratch.f_daily_schedule_hourly_org = (persona.scratch

@@ -753,5 +753,273 @@ function renderPersonaState(data) {
   $('#personaStateModalBody').html(html);
 }
 </script>
+
+<!-- ============================================ -->
+<!-- 线上舆论弹窗 - 木质风格 -->
+<!-- ============================================ -->
+<style>
+.online-forum-container {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    width: 420px;
+    max-width: 90vw;
+    height: 550px;
+    max-height: 80vh;
+    background: #D4A574;
+    border: 8px solid #8B6F47;
+    border-radius: 12px;
+    box-shadow: 
+        0 0 0 4px #A0826D,
+        0 8px 32px rgba(0, 0, 0, 0.5),
+        inset 0 2px 4px rgba(255, 255, 255, 0.2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 1001;
+    font-family: 'Microsoft YaHei', Arial, sans-serif;
+}
+
+.online-forum-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    background: repeating-linear-gradient(
+        90deg,
+        transparent 0px,
+        transparent 18px,
+        #8B6F47 18px,
+        #8B6F47 22px
+    );
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.forum-header {
+    background: linear-gradient(180deg, #A0826D 0%, #8B6F47 100%);
+    padding: 12px 15px;
+    border-bottom: 3px solid #6B4E3D;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+}
+
+.forum-header h2 {
+    color: #3D2817;
+    font-size: 16px;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+    letter-spacing: 2px;
+    margin: 0;
+}
+
+.forum-stats {
+    display: flex;
+    justify-content: space-around;
+    padding: 8px;
+    background: #C9976B;
+    border-bottom: 2px solid #8B6F47;
+}
+
+.forum-stat {
+    text-align: center;
+}
+
+.forum-stat-num {
+    color: #3D2817;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.forum-stat-label {
+    color: #6B4E3D;
+    font-size: 10px;
+}
+
+.forum-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    background: #E8D5B7;
+    scroll-behavior: smooth;
+}
+
+.forum-messages::-webkit-scrollbar {
+    width: 10px;
+}
+
+.forum-messages::-webkit-scrollbar-track {
+    background: #D4A574;
+    border-radius: 5px;
+}
+
+.forum-messages::-webkit-scrollbar-thumb {
+    background: #8B6F47;
+    border-radius: 5px;
+    border: 2px solid #D4A574;
+}
+
+.forum-message {
+    margin-bottom: 12px;
+    padding: 10px;
+    background: #F5E6D3;
+    border-left: 4px solid #8B6F47;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    animation: forumFadeIn 0.3s ease-in;
+}
+
+@keyframes forumFadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.forum-msg-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    padding-bottom: 5px;
+    border-bottom: 1px dashed #8B6F47;
+}
+
+.forum-author {
+    font-weight: bold;
+    color: #6B4E3D;
+    font-size: 13px;
+}
+
+.forum-author-real {
+    color: #8B6F47;
+    font-size: 11px;
+    font-weight: normal;
+}
+
+.forum-time {
+    font-size: 10px;
+    color: #8B6F47;
+}
+
+.forum-content {
+    color: #3D2817;
+    font-size: 12px;
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+.forum-empty {
+    text-align: center;
+    color: #8B6F47;
+    padding: 40px 20px;
+}
+
+.forum-empty-icon {
+    font-size: 40px;
+    margin-bottom: 10px;
+}
+</style>
+
+<div class="online-forum-container">
+    <div class="forum-header">
+        <h2>📱 线上舆论广场</h2>
+    </div>
+    
+    <div class="forum-stats">
+        <div class="forum-stat">
+            <div class="forum-stat-num" id="forumPostCount">0</div>
+            <div class="forum-stat-label">发言数</div>
+        </div>
+        <div class="forum-stat">
+            <div class="forum-stat-num" id="forumUserCount">0</div>
+            <div class="forum-stat-label">活跃用户</div>
+        </div>
+    </div>
+    
+    <div class="forum-messages" id="forumMessages">
+        <div class="forum-empty">
+            <div class="forum-empty-icon">🤫</div>
+            <p>还没有人发言</p>
+            <p style="font-size:11px;margin-top:5px;">等待居民们刷手机...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+// 线上舆论弹窗逻辑
+(function() {
+    // 角色头像映射
+    const avatarMap = {
+        '王丽华': '☕', '高建国': '🛵', '林小雨': '🌸',
+        '李大强': '💪', '陈思远': '🎙️', '周小艺': '🎨',
+        '韩小雪': '📚', '张国庆': '🚕', '刘小敏': '🍳'
+    };
+
+    // 加载帖子
+    async function loadForumPosts() {
+        try {
+            const response = await fetch('/get_online_posts/');
+            if (!response.ok) throw new Error('加载失败');
+            
+            const data = await response.json();
+            displayForumPosts(data.posts || []);
+            
+            // 更新统计
+            document.getElementById('forumPostCount').textContent = data.total || 0;
+            const uniqueUsers = new Set((data.posts || []).map(p => p.real_name));
+            document.getElementById('forumUserCount').textContent = uniqueUsers.size;
+        } catch (error) {
+            console.error('加载舆论失败:', error);
+        }
+    }
+
+    // 显示帖子
+    function displayForumPosts(posts) {
+        const container = document.getElementById('forumMessages');
+        
+        if (!posts || posts.length === 0) {
+            container.innerHTML = `
+                <div class="forum-empty">
+                    <div class="forum-empty-icon">🤫</div>
+                    <p>还没有人发言</p>
+                    <p style="font-size:11px;margin-top:5px;">等待居民们刷手机...</p>
+                </div>
+            `;
+            return;
+        }
+
+        // 按时间倒序
+        posts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        container.innerHTML = posts.map(post => `
+            <div class="forum-message">
+                <div class="forum-msg-header">
+                    <span class="forum-author">
+                        ${avatarMap[post.real_name] || '👤'} ${post.online_name || '匿名'}
+                        <span class="forum-author-real">(${post.real_name || ''})</span>
+                    </span>
+                    <span class="forum-time">${formatForumTime(post.timestamp)}</span>
+                </div>
+                <div class="forum-content">${post.content}</div>
+            </div>
+        `).join('');
+    }
+
+    // 格式化时间
+    function formatForumTime(timestamp) {
+        if (!timestamp) return '--';
+        const date = new Date(timestamp);
+        return `${date.getMonth()+1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+    }
+
+    // 初始化 - 只在页面加载时获取一次
+    loadForumPosts();
+    
+    // 暴露刷新函数，供外部调用（当有新帖子时）
+    window.refreshForumPosts = loadForumPosts;
+})();
+</script>
+
 {% endblock js_content %}
 

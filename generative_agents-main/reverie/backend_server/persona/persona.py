@@ -26,6 +26,9 @@ from persona.cognitive_modules.plan import *
 from persona.cognitive_modules.reflect import *
 from persona.cognitive_modules.execute import *
 from persona.cognitive_modules.converse import *
+from persona.cognitive_modules.phone_browsing import (
+    browse_phone, should_browse_phone
+)
 
 class Persona: 
   def __init__(self, name, folder_mem_saved=False):
@@ -221,6 +224,18 @@ class Persona:
     retrieved = self.retrieve(perceived)
     plan = self.plan(maze, personas, new_day, retrieved)
     self.reflect()
+
+    # 刷手机逻辑：检查是否应该刷手机
+    current_hour = curr_time.hour
+    if should_browse_phone(self, current_hour):
+      # 检查这个小时是否已经刷过
+      last_browse_hour = getattr(self.scratch, "_last_phone_browse_hour", -1)
+      if last_browse_hour != current_hour:
+        try:
+          browse_phone(self, maze)
+          self.scratch._last_phone_browse_hour = current_hour
+        except Exception as e:
+          print(f"[Phone] {self.scratch.name} 刷手机出错: {e}")
 
     # <execution> is a triple set that contains the following components: 
     # <next_tile> is a x,y coordinate. e.g., (58, 9)

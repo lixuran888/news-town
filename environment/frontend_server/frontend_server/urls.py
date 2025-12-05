@@ -33,5 +33,9 @@ urlpatterns = [
     url(r'^path_tester_update/$', translator_views.path_tester_update, name='path_tester_update'),
     url(r'^check_expert_meeting/$', translator_views.expert_meeting_trigger, name='check_expert_meeting'),
     url(r'^dismiss_expert_meeting/$', translator_views.dismiss_expert_meeting, name='dismiss_expert_meeting'),
+    # 线上舆论广场
+    url(r'^online_forum/$', translator_views.online_forum, name='online_forum'),
+    url(r'^get_online_posts/$', translator_views.get_online_posts, name='get_online_posts'),
+    url(r'^post_online_opinion/$', translator_views.post_online_opinion, name='post_online_opinion'),
     path('admin/', admin.site.urls),
 ]
