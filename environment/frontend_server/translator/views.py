@@ -108,6 +108,20 @@ def landing(request):
         with open(meta_path, 'w', encoding='utf-8') as f:
           json.dump(meta, f, indent=2, ensure_ascii=False)
         
+        # 额外写入 temp_storage，便于后端在 fork 时立即读取最新时间
+        try:
+          pending_path = os.path.join("temp_storage", "pending_start_time.json")
+          os.makedirs(os.path.dirname(pending_path), exist_ok=True)
+          with open(pending_path, 'w', encoding='utf-8') as f:
+            json.dump({
+              "start_date": formatted_date,
+              "curr_time": formatted_curr_time,
+              "saved_at": datetime.datetime.now().isoformat()
+            }, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+          # 不影响主流程，只记录日志
+          print(f"[landing] 写入 pending_start_time 失败: {e}")
+        
         message = f"开始时间已更新为 {formatted_date} {formatted_time}。下次运行新仿真时将使用此时间。"
         current_start_date = formatted_date
         current_curr_time = formatted_curr_time
