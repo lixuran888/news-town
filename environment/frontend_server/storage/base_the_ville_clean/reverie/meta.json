@@ -1,7 +1,7 @@
 {
   "fork_sim_code": "base_the_ville_clean",
   "start_date": "February 26, 2023",
-  "curr_time": "February 26, 2023, 22:50:00",
+  "curr_time": "February 26, 2023, 22:00:00",
   "sec_per_step": 10,
   "maze_name": "the_ville",
   "persona_names": [

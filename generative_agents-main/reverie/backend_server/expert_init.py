@@ -249,19 +249,47 @@ def generate_and_broadcast_public_opinion(personas: Dict[str, "Persona"],
 
 def _select_relevant_memory_nodes(persona,
                                   question: str,
-                                  max_memories: int) -> List["ConceptNode"]:
+                                  max_memories: int,
+                                  meeting_time: datetime.datetime = None) -> List["ConceptNode"]:
+  """检索与议题相关的记忆节点。
+  
+  Args:
+    persona: 角色对象
+    question: 议题/问题
+    max_memories: 最大返回数量
+    meeting_time: 会议时间，用于计算24小时时间窗口（前一天23:00到今天23:00）
+  """
   focal_points = [
     "当前校园食物中毒事件",
     "公众舆论",
     "食品安全监管",
     question or "",
   ]
-  retrieved = new_retrieve(persona, focal_points, n_count=max_memories)
+  retrieved = new_retrieve(persona, focal_points, n_count=max_memories * 3)  # 多检索一些，因为要过滤
+  
+  # 计算24小时时间窗口：前一天23:00 到 今天23:00
+  if meeting_time:
+    # 会议时间是今天23:00，往前推24小时就是昨天23:00
+    time_window_start = meeting_time - datetime.timedelta(hours=24)
+    time_window_end = meeting_time
+  else:
+    time_window_start = None
+    time_window_end = None
+  
   nodes: List["ConceptNode"] = []
   for lst in retrieved.values():
     for n in lst:
       if n not in nodes:
+        # 如果指定了时间窗口，过滤掉窗口外的记忆
+        if time_window_start and time_window_end:
+          try:
+            node_time = n.created
+            if node_time < time_window_start or node_time > time_window_end:
+              continue  # 跳过不在时间窗口内的记忆
+          except Exception:
+            pass  # 如果无法获取时间，保留该记忆
         nodes.append(n)
+  
   return nodes[:max_memories]
 
 
@@ -307,7 +335,8 @@ def expert_meeting_speech(persona,
                           max_rules: int = 3,
                           max_case_snippets: int = 3,
                           max_public_opinion: int = 1,
-                          max_web_results: int = 3) -> str:
+                          max_web_results: int = 3,
+                          meeting_time: datetime.datetime = None) -> str:
   """Generate an in-simulation expert speech for a meeting.
 
   The speech is grounded in:
@@ -315,6 +344,9 @@ def expert_meeting_speech(persona,
   - local food poisoning case knowledge paragraphs,
   - structured food safety rules (FS001–FS120),
   - Tavily web search results for real-time information.
+  
+  Args:
+    meeting_time: 会议时间，用于限制记忆检索到过去24小时内
   """
 
   if not question or not question.strip():
@@ -325,7 +357,7 @@ def expert_meeting_speech(persona,
   except Exception:
     name = getattr(persona, "name", "Expert")
 
-  memory_nodes = _select_relevant_memory_nodes(persona, question, max_memories)
+  memory_nodes = _select_relevant_memory_nodes(persona, question, max_memories, meeting_time)
   memory_block = _format_memory_nodes_for_prompt(memory_nodes)
 
   case_snippets: List[str] = retrieve_food_poisoning_knowledge(
@@ -405,7 +437,8 @@ def market_supervision_expert_meeting_speech(persona,
                                               max_rules: int = 3,
                                               max_case_snippets: int = 3,
                                               max_public_opinion: int = 1,
-                                              max_web_results: int = 3) -> str:
+                                              max_web_results: int = 3,
+                                              meeting_time: datetime.datetime = None) -> str:
   """Generate speech for Market Supervision Expert."""
   if not question or not question.strip():
     return "(empty question)"
@@ -415,7 +448,7 @@ def market_supervision_expert_meeting_speech(persona,
   except Exception:
     name = getattr(persona, "name", "Market Supervision Expert")
 
-  memory_nodes = _select_relevant_memory_nodes(persona, question, max_memories)
+  memory_nodes = _select_relevant_memory_nodes(persona, question, max_memories, meeting_time)
   memory_block = _format_memory_nodes_for_prompt(memory_nodes)
 
   case_snippets = retrieve_food_poisoning_knowledge(question, top_k=max_case_snippets)
@@ -486,7 +519,8 @@ def education_expert_meeting_speech(persona,
                                      max_rules: int = 3,
                                      max_case_snippets: int = 3,
                                      max_public_opinion: int = 1,
-                                     max_web_results: int = 3) -> str:
+                                     max_web_results: int = 3,
+                                     meeting_time: datetime.datetime = None) -> str:
   """Generate speech for Education Bureau Representative."""
   if not question or not question.strip():
     return "(empty question)"
@@ -496,7 +530,7 @@ def education_expert_meeting_speech(persona,
   except Exception:
     name = getattr(persona, "name", "Education Bureau Representative")
 
-  memory_nodes = _select_relevant_memory_nodes(persona, question, max_memories)
+  memory_nodes = _select_relevant_memory_nodes(persona, question, max_memories, meeting_time)
   memory_block = _format_memory_nodes_for_prompt(memory_nodes)
 
   case_snippets = retrieve_food_poisoning_knowledge(question, top_k=max_case_snippets)
@@ -609,14 +643,15 @@ def moderator_opening_speech(persona,
                               max_memories: int = 4,
                               max_case_snippets: int = 2,
                               max_rules: int = 3,
-                              max_public_opinion: int = 1) -> str:
+                              max_public_opinion: int = 1,
+                              meeting_time: datetime.datetime = None) -> str:
   """主持人开场白：介绍会议背景、与会专家、议程规则、并引导第一位专家发言。"""
   try:
     name = getattr(persona.scratch, "name", persona.name)
   except Exception:
     name = getattr(persona, "name", "Meeting Moderator")
 
-  memory_nodes = _select_relevant_memory_nodes(persona, topic, max_memories)
+  memory_nodes = _select_relevant_memory_nodes(persona, topic, max_memories, meeting_time)
   memory_block = _format_memory_nodes_for_prompt(memory_nodes)
 
   case_snippets = retrieve_food_poisoning_knowledge(topic, top_k=max_case_snippets)
@@ -632,6 +667,7 @@ def moderator_opening_speech(persona,
 
   prompt = (
     "你是一名专业的会议主持人，正在主持一场关于校园食品安全的专家咨询会议。\n"
+    "当前时间是晚上11点（23:00），这是一场晚间紧急会议。\n"
     "请基于下列信息进行开场发言：\n\n"
     "【一、长期记忆片段】\n"
     f"{memory_block}\n\n"
@@ -879,38 +915,254 @@ def moderator_round_summary(persona,
                              round_num: int,
                              round_speeches: List[Dict[str, str]],
                              topic: str,
-                             max_rules: int = 3) -> str:
+                             max_rules: int = 3,
+                             max_memories: int = 4,
+                             max_public_opinion: int = 1,
+                             meeting_time: datetime.datetime = None) -> str:
   """主持人轮次总结：总结本轮所有专家发言，提炼共识和分歧。"""
   try:
     name = getattr(persona.scratch, "name", persona.name)
   except Exception:
     name = getattr(persona, "name", "Meeting Moderator")
 
+  # 检索主持人的长期记忆（包括平民舆论），限制在过去24小时内
+  memory_nodes = _select_relevant_memory_nodes(persona, topic, max_memories, meeting_time)
+  memory_block = _format_memory_nodes_for_prompt(memory_nodes)
+  
+  # 检索公众舆论（从平民对话中收集）
+  opinion_block = _format_public_opinion_from_nodes(memory_nodes, max_public_opinion)
+
   rules = retrieve_moderator_rules("总结 归纳 共识", top_k=max_rules)
   rules_block = format_moderator_rules_for_prompt(rules)
 
-  # 格式化本轮发言
+  # 格式化本轮发言（完整版）
   speeches_text = ""
   for sp in round_speeches:
     speeches_text += f"【{sp.get('speaker', '专家')}】:\n{sp.get('content', '')}\n\n"
 
+  # 保存思考过程到全局变量（供前端显示）
+  global _last_expert_reasoning
+  _last_expert_reasoning = {
+    "memory": memory_block,
+    "expert_speeches": speeches_text,
+    "rules": rules_block,
+    "public_opinion": opinion_block,
+  }
+  
+  # 打印思考过程日志
+  print(f"\n{'='*60}")
+  print(f"[思考过程] 主持人正在总结第 {round_num} 轮讨论...")
+  print(f"{'='*60}")
+  print(f"📝 长期记忆:\n{memory_block[:400]}..." if len(memory_block) > 400 else f"📝 长期记忆:\n{memory_block}")
+  print(f"\n💬 本轮专家发言:\n{speeches_text[:800]}..." if len(speeches_text) > 800 else f"\n� 本轮专家发言:\n{speeches_text}")
+  print(f"\n📋 主持人规则库:\n{rules_block[:300]}..." if len(rules_block) > 300 else f"\n📋 主持人规则库:\n{rules_block}")
+  print(f"\n👥 公众舆论:\n{opinion_block[:300]}..." if len(opinion_block) > 300 else f"\n👥 公众舆论:\n{opinion_block}")
+  print(f"{'='*60}\n")
+
   prompt = (
     "你是一名专业的会议主持人，正在主持校园食品安全专家咨询会议。\n"
     f"第 {round_num} 轮讨论已结束，请进行本轮总结。\n\n"
-    "【主持人规则库】\n"
+    "【一、长期记忆片段】\n"
+    f"{memory_block}\n\n"
+    "【二、主持人规则库】\n"
     f"{rules_block}\n\n"
-    "【本轮专家发言】\n"
+    "【三、公众舆论（平民对话摘要）】\n"
+    f"{opinion_block}\n\n"
+    "【四、本轮专家发言】\n"
     f"{speeches_text}\n"
-    "【会议主题】\n"
+    "【五、会议主题】\n"
     f"{topic.strip()}\n\n"
     f"请以 {name} 的身份进行本轮总结，要求：\n"
     "1. 提炼各专家发言的核心观点。\n"
     "2. 明确指出专家之间的共识点。\n"
     "3. 如实反映专家之间的分歧。\n"
-    "4. 总结本轮讨论形成的可操作建议。\n"
+    "4. 结合公众舆论，总结本轮讨论形成的可操作建议。\n"
     "5. 为下一轮讨论提出引导性问题（如有）。\n"
   )
   return ChatGPT_single_request(prompt)
+
+
+def moderator_final_summary_and_decision(persona,
+                                          round_speeches: List[Dict[str, str]],
+                                          all_round_summaries: List[str],
+                                          topic: str,
+                                          max_rules: int = 3,
+                                          max_memories: int = 4,
+                                          meeting_time: datetime.datetime = None) -> str:
+  """主持人最终总结与决策（用于最后一轮）。
+  
+  与普通轮次总结不同，这个函数会：
+  1. 总结本轮（第三轮）讨论要点
+  2. 回顾并整合前两轮总结
+  3. 形成完整的会议结论
+  4. 提出明确的最终决策和行动建议
+  
+  不会再提"下一轮讨论"。
+  """
+  try:
+    name = getattr(persona.scratch, "name", persona.name)
+  except Exception:
+    name = getattr(persona, "name", "Meeting Moderator")
+
+  # 检索记忆（过去24小时）
+  memory_nodes = _select_relevant_memory_nodes(persona, topic, max_memories, meeting_time)
+  memory_block = _format_memory_nodes_for_prompt(memory_nodes)
+  
+  # 公众舆论
+  opinion_block = _format_public_opinion_from_nodes(memory_nodes, max_public_opinion=1)
+
+  rules = retrieve_moderator_rules("总结 决策 结论", top_k=max_rules)
+  rules_block = format_moderator_rules_for_prompt(rules)
+
+  # 格式化本轮发言（完整版）
+  current_round_text = ""
+  for sp in round_speeches:
+    current_round_text += f"【{sp.get('speaker', '专家')}】:\n{sp.get('content', '')}\n\n"
+
+  # 格式化前几轮总结
+  previous_summaries_text = ""
+  for i, summary in enumerate(all_round_summaries, 1):
+    previous_summaries_text += f"【第{i}轮总结】\n{summary}\n\n"
+
+  # 保存思考过程到全局变量（供前端显示）
+  global _last_expert_reasoning
+  _last_expert_reasoning = {
+    "memory": memory_block,
+    "previous_summaries": previous_summaries_text,
+    "current_round_speeches": current_round_text,
+    "rules": rules_block,
+    "public_opinion": opinion_block,
+  }
+  
+  # 打印思考过程日志
+  print(f"\n{'='*60}")
+  print(f"[思考过程] 主持人正在生成最终总结与决策...")
+  print(f"{'='*60}")
+  print(f"📝 长期记忆:\n{memory_block[:300]}..." if len(memory_block) > 300 else f"📝 长期记忆:\n{memory_block}")
+  print(f"\n📋 前几轮总结:\n{previous_summaries_text[:500]}..." if len(previous_summaries_text) > 500 else f"\n📋 前几轮总结:\n{previous_summaries_text}")
+  print(f"\n💬 本轮发言:\n{current_round_text[:500]}..." if len(current_round_text) > 500 else f"\n💬 本轮发言:\n{current_round_text}")
+  print(f"{'='*60}\n")
+
+  prompt = (
+    "你是一名专业的会议主持人，正在主持校园食品安全专家咨询会议。\n"
+    "这是本次会议的**最后一轮**讨论，你需要做出最终总结和决策，**不要再提下一轮讨论**。\n"
+    "当前时间是晚上11点（23:00），这是一场晚间紧急会议。\n\n"
+    "【一、长期记忆片段】\n"
+    f"{memory_block}\n\n"
+    "【二、主持人规则库】\n"
+    f"{rules_block}\n\n"
+    "【三、公众舆论（平民对话摘要）】\n"
+    f"{opinion_block}\n\n"
+    "【四、前几轮讨论总结（你之前的总结）】\n"
+    f"{previous_summaries_text}\n"
+    "【五、本轮（最后一轮）专家发言】\n"
+    f"{current_round_text}\n"
+    "【六、会议主题】\n"
+    f"{topic.strip()}\n\n"
+    f"请以 {name} 的身份，完成以下内容（这是最终总结，不要再提下一轮）：\n\n"
+    "## 一、本轮讨论要点\n"
+    "简要总结本轮（最后一轮）各专家的核心观点。\n\n"
+    "## 二、全程会议回顾\n"
+    "整合三轮讨论的主要成果，归纳专家共识和分歧。\n\n"
+    "## 三、最终决策与行动建议\n"
+    "基于全部讨论，提出明确的、可操作的最终决策，包括：\n"
+    "1. **立即行动**（24-48小时内必须完成）\n"
+    "2. **短期措施**（1-2周内落实）\n"
+    "3. **长期制度建设**（1-3个月内推进）\n\n"
+    "## 四、责任分工\n"
+    "明确各部门（卫健、市场监管、教育）的具体责任。\n\n"
+    "## 五、结语\n"
+    "简短的会议闭幕语，感谢各位专家，宣布会议结束。\n\n"
+    "要求：语气专业、结论明确、行动清晰，体现最终决策的权威性。"
+  )
+  return ChatGPT_single_request(prompt)
+
+
+def extract_decision_for_civilians(final_decision: str, topic: str) -> str:
+  """从专家会议最终决策中提取客观政策通报。
+  
+  注意：只提取客观的政策内容，不预先分析影响。
+  让平民agent自己理解和讨论这些政策对自己的影响，这样更真实。
+  """
+  if not final_decision:
+    return ""
+  
+  prompt = (
+    "你是一名政务信息发布官员。请将以下专家会议决策转换为面向公众的官方通报。\n\n"
+    f"【原始决策】\n{final_decision[:3000]}\n\n"
+    "请按以下格式输出（控制在200字以内）：\n\n"
+    "【关于校园食品安全事件的处置通报】\n\n"
+    "一、事件概况：（一句话客观描述）\n\n"
+    "二、已采取措施：\n"
+    "  - （列出3-4条已实施的措施）\n\n"
+    "三、后续安排：\n"
+    "  - （时间表和下一步计划）\n\n"
+    "四、咨询渠道：\n"
+    "  - （投诉电话等）\n\n"
+    "要求：\n"
+    "1. 只陈述客观事实和政策，不要分析'对谁有什么影响'\n"
+    "2. 语言正式但通俗，像政府公告\n"
+    "3. 不要说教或建议市民做什么"
+  )
+  
+  try:
+    civilian_version = ChatGPT_single_request(prompt)
+    return civilian_version if civilian_version else ""
+  except Exception as e:
+    print(f"[Decision] 提取平民版决策失败: {e}")
+    return ""
+
+
+def broadcast_decision_to_civilians(personas: Dict[str, "Persona"],
+                                     decision_summary: str,
+                                     topic: str,
+                                     created_time: datetime.datetime) -> None:
+  """将决策摘要写入所有非专家平民的记忆。
+  
+  这样平民可以在后续对话中讨论和分析决策对自己的影响。
+  """
+  if not decision_summary:
+    return
+  
+  print(f"[Decision] 正在将决策通报写入平民记忆...")
+  
+  civilian_count = 0
+  for name, persona in personas.items():
+    # 跳过专家和主持人
+    if _is_expert_persona(persona) or _is_moderator_persona(persona):
+      continue
+    
+    try:
+      expiration = None
+      s = "校园食品安全专家会议决策"
+      p = "影响"
+      o = "学校食堂和家长"
+      description = decision_summary
+      keywords = {"专家会议决策", "食品安全", "校园", "家长", "学生", "食堂"}
+      poignancy = 0.85  # 高重要性
+      embedding_key = f"expert_meeting_decision_{created_time.strftime('%Y%m%d')}"
+      embedding_vec = get_embedding(description[:500])
+      embedding_pair = (embedding_key, embedding_vec)
+      filling: List = []
+      
+      persona.a_mem.add_event(
+        created=created_time,
+        expiration=expiration,
+        s=s,
+        p=p,
+        o=o,
+        description=description,
+        keywords=keywords,
+        poignancy=poignancy,
+        embedding_pair=embedding_pair,
+        filling=filling,
+      )
+      civilian_count += 1
+    except Exception as e:
+      print(f"[Decision] 写入 {name} 记忆失败: {e}")
+      continue
+  
+  print(f"[Decision] 决策通报已写入 {civilian_count} 个平民的记忆")
 
 
 def moderator_summary_with_advice(persona,
@@ -967,6 +1219,51 @@ def moderator_summary_with_advice(persona,
     "4. 整体控制在300字以内，语气专业简洁。\n"
   )
   return ChatGPT_single_request(prompt)
+
+
+def extract_speech_key_points(speaker_name: str, 
+                               speaker_role: str,
+                               speech_content: str,
+                               topic: str) -> str:
+  """从专家发言中提取核心要点，用于写入记忆。
+  
+  Args:
+    speaker_name: 发言者名字
+    speaker_role: 发言者角色（如"公共卫生专家"）
+    speech_content: 完整发言内容
+    topic: 会议主题
+    
+  Returns:
+    格式化的要点摘要（约150-200字）
+  """
+  if not speech_content or len(speech_content) < 50:
+    return speech_content
+  
+  role_desc = {
+    "public_health_expert": "公共卫生专家",
+    "market_supervision_expert": "市场监管专家", 
+    "education_expert": "教育局代表",
+    "moderator": "主持人"
+  }.get(speaker_role, speaker_role)
+  
+  prompt = (
+    f"请从以下{role_desc}的发言中提取核心要点，用于存入记忆系统。\n\n"
+    f"【发言者】{speaker_name}（{role_desc}）\n"
+    f"【会议主题】{topic}\n"
+    f"【原始发言】\n{speech_content}\n\n"
+    "请按以下格式提取要点（控制在150-200字）：\n"
+    f"【{speaker_name}核心观点】\n"
+    "1. 根源判断：（一句话概括其对问题根源的判断）\n"
+    "2. 主要建议：（列出2-3条最重要的建议）\n"
+    "3. 关键立场：（其与其他专家可能的共识或分歧点）\n"
+  )
+  
+  try:
+    key_points = ChatGPT_single_request(prompt)
+    return key_points if key_points else speech_content[:300]
+  except Exception as e:
+    print(f"[Memory] 提取要点失败: {e}")
+    return speech_content[:300] + "..."
 
 
 def write_meeting_memory(persona,
@@ -1060,20 +1357,27 @@ def write_meeting_to_moderator_memory(moderator,
                                        topic: str,
                                        round_num: int,
                                        created_time: datetime.datetime) -> None:
-  """将本轮会议内容写入主持人的记忆（包括所有专家发言和总结）。"""
+  """将本轮会议内容写入主持人的记忆（包括所有专家发言和总结）。
+  
+  注意：专家发言会先提取要点再写入，而非写入原文。
+  """
   if not moderator:
     return
   
-  # 写入每个专家的发言
+  # 写入每个专家的发言（提取要点后）
   for speech in round_speeches:
     speaker = speech.get("speaker", "专家")
+    role = speech.get("role", "expert")
     content = speech.get("content", "")
     if content:
+      # 先提取要点，再写入记忆
+      key_points = extract_speech_key_points(speaker, role, content, topic)
+      print(f"[Memory] 为 {speaker} 的发言提取要点...")
       write_meeting_memory(
-        moderator, content, "expert_speech", topic, round_num, created_time, speaker
+        moderator, key_points, "expert_speech", topic, round_num, created_time, speaker
       )
   
-  # 写入自己的总结
+  # 写入自己的总结（总结本身已经是精炼的，直接写入）
   if summary:
     write_meeting_memory(
       moderator, summary, "summary", topic, round_num, created_time, "自己"
@@ -1291,7 +1595,8 @@ class ExpertMeeting:
       self.moderator,
       self.topic,
       self.get_expert_names(),
-      first_expert_name=first_expert_name
+      first_expert_name=first_expert_name,
+      meeting_time=self.created_time  # 传入会议时间，限制记忆检索到过去24小时
     )
     self.all_speeches.append({
       "speaker": getattr(self.moderator.scratch, "name", self.moderator.name),
@@ -1347,7 +1652,7 @@ class ExpertMeeting:
     """专家发言。"""
     global _last_expert_reasoning
     speech_func = get_expert_speech_function(expert)
-    speech = speech_func(expert, question)
+    speech = speech_func(expert, question, meeting_time=self.created_time)  # 传入会议时间
 
     expert_name = getattr(expert.scratch, "name", expert.name)
     speech_record = {
@@ -1437,17 +1742,36 @@ class ExpertMeeting:
     
     return advice
 
-  def end_round(self) -> str:
-    """结束本轮讨论：主持人总结。"""
+  def end_round(self, is_final_round: bool = False) -> str:
+    """结束本轮讨论：主持人总结。
+    
+    Args:
+      is_final_round: 是否是最后一轮。如果是，将生成最终总结和决策，不再提下一轮。
+    """
     if not self.moderator:
       return ""
 
-    summary = moderator_round_summary(
-      self.moderator,
-      self.current_round,
-      self.round_speeches,
-      self.topic
-    )
+    if is_final_round:
+      # 最后一轮：生成最终总结和决策
+      summary = moderator_final_summary_and_decision(
+        self.moderator,
+        self.round_speeches,
+        self.round_summaries,  # 传入前几轮的总结
+        self.topic,
+        meeting_time=self.created_time
+      )
+      summary_type = "final_summary"
+    else:
+      # 非最后一轮：普通总结
+      summary = moderator_round_summary(
+        self.moderator,
+        self.current_round,
+        self.round_speeches,
+        self.topic,
+        meeting_time=self.created_time
+      )
+      summary_type = "summary"
+    
     self.round_summaries.append(summary)
 
     # 将总结写入所有专家的记忆
@@ -1472,8 +1796,9 @@ class ExpertMeeting:
     self.all_speeches.append({
       "speaker": getattr(self.moderator.scratch, "name", self.moderator.name),
       "role": "moderator",
-      "type": "summary",
-      "content": summary
+      "type": summary_type,
+      "content": summary,
+      "reasoning": _last_expert_reasoning.copy() if _last_expert_reasoning else {}
     })
     return summary
 
@@ -1488,6 +1813,8 @@ class ExpertMeeting:
     使得在下一个时间步时，原有的反思机制会自动生成：
     - planning_thought: 规划相关反思
     - memo_thought: 对话备忘反思
+    
+    同时，将最终决策写入所有平民的记忆。
     """
     # 计算会议结束时间（当前时间 + 几秒）
     meeting_end_time = self.created_time + datetime.timedelta(seconds=5)
@@ -1499,6 +1826,24 @@ class ExpertMeeting:
       self.topic
     )
     print(f"[Meeting] 会议已结束，反思将在下一时间步触发")
+    
+    # 将最终决策写入平民记忆
+    if self.round_summaries:
+      final_decision = self.round_summaries[-1]  # 最后一轮的总结就是最终决策
+      
+      # 提取平民版决策
+      print(f"[Meeting] 正在提取平民版决策...")
+      civilian_decision = extract_decision_for_civilians(final_decision, self.topic)
+      
+      if civilian_decision:
+        # 写入所有平民的记忆
+        broadcast_decision_to_civilians(
+          self.personas,
+          civilian_decision,
+          self.topic,
+          meeting_end_time
+        )
+        print(f"[Meeting] 平民版决策已广播完成")
 
   def run_full_round(self, use_dynamic_order: bool = True) -> List[Dict[str, str]]:
     """运行完整的一轮讨论：
@@ -1571,8 +1916,13 @@ class ExpertMeeting:
 
     return round_results
 
-  def run_full_round_streaming(self, on_speech_callback, use_dynamic_order: bool = True) -> List[Dict[str, str]]:
+  def run_full_round_streaming(self, on_speech_callback, use_dynamic_order: bool = True, is_final_round: bool = False) -> List[Dict[str, str]]:
     """运行完整的一轮讨论（流式版本，每生成一条发言就回调更新）。
+    
+    Args:
+      on_speech_callback: 回调函数
+      use_dynamic_order: 是否让主持人动态决定发言顺序
+      is_final_round: 是否是最后一轮。如果是，将生成最终总结和决策，不再对专家提意见。
     
     流程：
     1. 主持人决定顺序
@@ -1627,27 +1977,38 @@ class ExpertMeeting:
       print(f"[Meeting] {expert_name} 发言完成")
 
     # 阶段3：主持人总结
-    on_speech_callback(self.get_all_speeches(), "in_progress", "主持人总结中...")
-    summary = self.end_round()
-    round_results.append({
-      "type": "round_summary",
-      "content": summary
-    })
-    on_speech_callback(self.get_all_speeches(), "in_progress", None)
-    print(f"[Meeting] 主持人总结完成")
-
-    # 阶段4：主持人对每个专家给出针对性意见
-    for expert in self.expert_order:
-      expert_name = getattr(expert.scratch, "name", expert.name)
-      
-      on_speech_callback(self.get_all_speeches(), "in_progress", f"对 {expert_name} 提出意见...")
-      advice = self.moderator_give_targeted_advice(expert)
+    if is_final_round:
+      on_speech_callback(self.get_all_speeches(), "in_progress", "主持人生成最终总结与决策...")
+      summary = self.end_round(is_final_round=True)
       round_results.append({
-        "type": "advice",
-        "target_expert": expert_name,
-        "content": advice
+        "type": "final_summary",
+        "content": summary
       })
       on_speech_callback(self.get_all_speeches(), "in_progress", None)
-      print(f"[Meeting] 主持人对 {expert_name} 的意见完成")
+      print(f"[Meeting] 最终总结与决策完成")
+      # 最后一轮不再对专家提意见
+    else:
+      on_speech_callback(self.get_all_speeches(), "in_progress", "主持人总结中...")
+      summary = self.end_round(is_final_round=False)
+      round_results.append({
+        "type": "round_summary",
+        "content": summary
+      })
+      on_speech_callback(self.get_all_speeches(), "in_progress", None)
+      print(f"[Meeting] 主持人总结完成")
+
+      # 阶段4：主持人对每个专家给出针对性意见（仅非最后一轮）
+      for expert in self.expert_order:
+        expert_name = getattr(expert.scratch, "name", expert.name)
+        
+        on_speech_callback(self.get_all_speeches(), "in_progress", f"对 {expert_name} 提出意见...")
+        advice = self.moderator_give_targeted_advice(expert)
+        round_results.append({
+          "type": "advice",
+          "target_expert": expert_name,
+          "content": advice
+        })
+        on_speech_callback(self.get_all_speeches(), "in_progress", None)
+        print(f"[Meeting] 主持人对 {expert_name} 的意见完成")
 
     return round_results

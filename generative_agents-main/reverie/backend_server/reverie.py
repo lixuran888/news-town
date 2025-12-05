@@ -28,6 +28,7 @@ import os
 import shutil
 import traceback
 import webbrowser
+import threading
 
 from selenium import webdriver
 
@@ -594,76 +595,91 @@ class ReverieServer:
                 )
                 self.last_public_opinion_date = curr_date
                 
-              # 23:00准时触发会议弹窗并运行专家会议
-              if not self.meeting_triggered:
-                print(f"[Reverie] ⏰ 23:00 准时触发专家会议!")
-                
-                # 运行专家会议
-                meeting_topic = "校园食物中毒事件的应对措施与责任追究"
-                trigger_file = f"{fs_temp_storage}/expert_meeting_trigger.json"
-                
-                # 定义实时更新触发文件的回调函数
-                def update_trigger_file(speeches, status="in_progress", pending_speaker=None):
-                  trigger_data = {
-                    "timestamp": self.curr_time.isoformat(),
-                    "action": "show_expert_conversation",
-                    "topic": meeting_topic,
-                    "speeches": speeches,
-                    "status": status,
-                    "pending_speaker": pending_speaker,
-                    "round_summaries": []
-                  }
-                  with open(trigger_file, "w", encoding="utf-8") as f:
-                    json.dump(trigger_data, f, ensure_ascii=False, indent=2)
-                
-                try:
-                  meeting = ExpertMeeting(self.personas, meeting_topic, self.curr_time)
-                  
-                  # 1. 先创建触发文件，显示"准备中"
-                  update_trigger_file([], status="preparing", pending_speaker="主持人")
-                  print(f"[Meeting] 弹窗已触发，等待主持人开场...")
-                  
-                  # 2. 主持人开场
-                  opening = meeting.start_meeting()
-                  update_trigger_file(meeting.get_all_speeches(), status="in_progress", pending_speaker=None)
-                  print(f"[Meeting] 主持人开场完成")
-                  
-                  # 3. 运行多轮讨论（共3轮）
-                  total_rounds = 3
-                  for round_num in range(1, total_rounds + 1):
-                    round_results = meeting.run_full_round_streaming(update_trigger_file)
-                    print(f"[Meeting] 第{round_num}轮讨论完成，共 {len(round_results)} 条发言")
-                  
-                  # 4. 完成：设置对话状态触发反思
-                  meeting.finalize_meeting()
-                  
-                  # 5. 最终更新触发文件
-                  trigger_data = {
-                    "timestamp": self.curr_time.isoformat(),
-                    "action": "show_expert_conversation",
-                    "topic": meeting_topic,
-                    "speeches": meeting.get_all_speeches(),
-                    "status": "completed",
-                    "round_summaries": meeting.round_summaries
-                  }
-                  with open(trigger_file, "w", encoding="utf-8") as f:
-                    json.dump(trigger_data, f, ensure_ascii=False, indent=2)
-                  
-                  print(f"[Meeting] 会议内容已保存到触发文件")
-                  
-                except Exception as e:
-                  print(f"[Meeting] 会议运行异常: {e}")
-                  traceback.print_exc()
-                  trigger_data = {
-                    "timestamp": self.curr_time.isoformat(),
-                    "action": "show_expert_conversation",
-                    "status": "error",
-                    "error": str(e)
-                  }
-                  with open(trigger_file, "w", encoding="utf-8") as f:
-                    json.dump(trigger_data, f, ensure_ascii=False)
-                
+              # 23:00准时触发会议弹窗并运行专家会议（后台线程，不阻塞主循环）
+              if not self.meeting_triggered and not getattr(self, '_meeting_thread_running', False):
+                print(f"[Reverie] ⏰ 23:00 准时触发专家会议（后台线程）!")
                 self.meeting_triggered = True
+                self._meeting_thread_running = True
+                
+                # 在后台线程中运行会议
+                def run_meeting_in_background():
+                  meeting_topic = "校园食物中毒事件的应对措施与责任追究"
+                  trigger_file = f"{fs_temp_storage}/expert_meeting_trigger.json"
+                  meeting_start_time = self.curr_time  # 捕获会议开始时间
+                  
+                  # 定义实时更新触发文件的回调函数
+                  def update_trigger_file(speeches, status="in_progress", pending_speaker=None):
+                    trigger_data = {
+                      "timestamp": meeting_start_time.isoformat(),
+                      "action": "show_expert_conversation",
+                      "topic": meeting_topic,
+                      "speeches": speeches,
+                      "status": status,
+                      "pending_speaker": pending_speaker,
+                      "round_summaries": []
+                    }
+                    with open(trigger_file, "w", encoding="utf-8") as f:
+                      json.dump(trigger_data, f, ensure_ascii=False, indent=2)
+                  
+                  try:
+                    meeting = ExpertMeeting(self.personas, meeting_topic, meeting_start_time)
+                    
+                    # 1. 先创建触发文件，显示"准备中"
+                    update_trigger_file([], status="preparing", pending_speaker="主持人")
+                    print(f"[Meeting] 弹窗已触发，等待主持人开场...")
+                    
+                    # 2. 主持人开场
+                    opening = meeting.start_meeting()
+                    update_trigger_file(meeting.get_all_speeches(), status="in_progress", pending_speaker=None)
+                    print(f"[Meeting] 主持人开场完成")
+                    
+                    # 3. 运行多轮讨论（共3轮）
+                    total_rounds = 3
+                    for round_num in range(1, total_rounds + 1):
+                      is_final = (round_num == total_rounds)  # 最后一轮
+                      round_results = meeting.run_full_round_streaming(update_trigger_file, is_final_round=is_final)
+                      if is_final:
+                        print(f"[Meeting] 第{round_num}轮（最终轮）讨论完成，已生成最终决策")
+                      else:
+                        print(f"[Meeting] 第{round_num}轮讨论完成，共 {len(round_results)} 条发言")
+                    
+                    # 4. 完成：设置对话状态触发反思
+                    meeting.finalize_meeting()
+                    
+                    # 5. 最终更新触发文件
+                    trigger_data = {
+                      "timestamp": meeting_start_time.isoformat(),
+                      "action": "show_expert_conversation",
+                      "topic": meeting_topic,
+                      "speeches": meeting.get_all_speeches(),
+                      "status": "completed",
+                      "round_summaries": meeting.round_summaries
+                    }
+                    with open(trigger_file, "w", encoding="utf-8") as f:
+                      json.dump(trigger_data, f, ensure_ascii=False, indent=2)
+                    
+                    print(f"[Meeting] 会议内容已保存到触发文件")
+                    
+                  except Exception as e:
+                    print(f"[Meeting] 会议运行异常: {e}")
+                    traceback.print_exc()
+                    trigger_data = {
+                      "timestamp": meeting_start_time.isoformat(),
+                      "action": "show_expert_conversation",
+                      "status": "error",
+                      "error": str(e)
+                    }
+                    with open(trigger_file, "w", encoding="utf-8") as f:
+                      json.dump(trigger_data, f, ensure_ascii=False)
+                  
+                  finally:
+                    self._meeting_thread_running = False
+                    print(f"[Meeting] 后台会议线程结束")
+                
+                # 启动后台线程
+                meeting_thread = threading.Thread(target=run_meeting_in_background, daemon=True)
+                meeting_thread.start()
+                print(f"[Meeting] 后台线程已启动，主循环继续运行...")
                 
           except Exception:
             # 不让舆论模块的异常影响主循环

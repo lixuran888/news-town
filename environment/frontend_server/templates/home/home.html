@@ -116,7 +116,7 @@
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  padding-right: 48px;
+  padding-right: 20px;
 }
 
 .expert-board-wrapper {
@@ -130,8 +130,8 @@
 .expert-board {
   width: 420px;
   max-width: calc(100vw - 32px);
-  height: calc(100vh - 60px);
-  max-height: calc(100vh - 60px);
+  height: calc(100vh - 30px);
+  max-height: calc(100vh - 30px);
   background: rgba(15, 23, 42, 0.95);
   border-radius: 24px;
   border: 1px solid rgba(147, 197, 253, 0.35);
@@ -412,7 +412,7 @@
 }
 
 .speech-content {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   line-height: 1.6;
   color: rgba(226, 232, 240, 0.9);
   white-space: pre-wrap;
@@ -446,14 +446,14 @@
 
 .search-label {
   display: block;
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   color: rgba(147, 197, 253, 0.7);
   font-weight: 500;
   margin-bottom: 4px;
 }
 
 .search-content {
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   color: rgba(148, 163, 184, 0.85);
   line-height: 1.5;
   white-space: pre-wrap;
@@ -463,6 +463,25 @@
   border-radius: 4px;
   max-height: 200px;
   overflow-y: auto;
+}
+
+/* 搜索内容区域的滚动条样式 */
+.search-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.search-content::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.5);
+  border-radius: 3px;
+}
+
+.search-content::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.5);
+  border-radius: 3px;
+}
+
+.search-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7);
 }
 
 /* 等待提示样式 */

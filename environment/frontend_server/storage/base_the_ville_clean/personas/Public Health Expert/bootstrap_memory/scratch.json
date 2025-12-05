@@ -4,7 +4,7 @@
   "retention": 8,
   "curr_time": null,
   "curr_tile": null,
-  "daily_plan_req": "Public Health Expert reviews medical data, interviews residents, visits locations to assess health risks, analyzes symptoms of food poisoning.",
+  "daily_plan_req": "Public Health Expert reviews medical data, interviews residents, visits locations to assess health risks, analyzes symptoms of food poisoning. Every night at 11pm, he attends the expert consultation meeting at the Dorm for Oak Hill College common room to discuss findings with other experts.",
   "name": "Public Health Expert",
   "first_name": "Public Health",
   "last_name": "Expert",

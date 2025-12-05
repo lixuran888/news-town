@@ -4,7 +4,7 @@
   "retention": 8,
   "curr_time": null,
   "curr_tile": null,
-  "daily_plan_req": "Market Supervision Expert analyzes market data, inspects food establishments, interviews business owners about food safety compliance.",
+  "daily_plan_req": "Market Supervision Expert analyzes market data, inspects food establishments, interviews business owners about food safety compliance. Every night at 11pm, he attends the expert consultation meeting at the Dorm for Oak Hill College common room to discuss findings with other experts.",
   "name": "Market Supervision Expert",
   "first_name": "Market Supervision",
   "last_name": "Expert",

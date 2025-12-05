@@ -732,6 +732,9 @@
 				typeClass += ' speech-feedback';
 				var targetExpert = sp.target_expert || '';
 				typeLabel = '【反馈→' + targetExpert + '】';
+			} else if (type === 'final_summary') {
+				typeClass += ' speech-summary speech-final';
+				typeLabel = '【🏁 最终总结与决策】';
 			} else if (type === 'summary') {
 				typeClass += ' speech-summary';
 				typeLabel = '【总结与意见】';
@@ -767,6 +770,15 @@
 				html += '<div class="search-context-header">📋 信息检索与思考依据</div>';
 				if (r.memory) {
 					html += '<div class="search-item"><span class="search-label">📝 长期记忆检索:</span><div class="search-content">' + escapeHtml(r.memory) + '</div></div>';
+				}
+				if (r.previous_summaries) {
+					html += '<div class="search-item"><span class="search-label">📜 前几轮总结（回顾）:</span><div class="search-content">' + escapeHtml(r.previous_summaries) + '</div></div>';
+				}
+				if (r.current_round_speeches) {
+					html += '<div class="search-item"><span class="search-label">💬 本轮专家发言:</span><div class="search-content">' + escapeHtml(r.current_round_speeches) + '</div></div>';
+				}
+				if (r.expert_speeches) {
+					html += '<div class="search-item"><span class="search-label">💬 本轮专家发言（全文）:</span><div class="search-content">' + escapeHtml(r.expert_speeches) + '</div></div>';
 				}
 				if (r.case_knowledge) {
 					html += '<div class="search-item"><span class="search-label">📚 案例知识库:</span><div class="search-content">' + escapeHtml(r.case_knowledge) + '</div></div>';
