@@ -418,6 +418,53 @@
   white-space: pre-wrap;
 }
 
+/* 搜索/思考依据样式（灰色小字，显示在正式发言之前） */
+.search-context {
+  background: rgba(30, 41, 59, 0.6);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  border-left: 2px solid rgba(148, 163, 184, 0.3);
+}
+
+.search-context-header {
+  font-size: 0.75rem;
+  color: rgba(148, 163, 184, 0.8);
+  font-weight: 600;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.search-item {
+  margin-bottom: 10px;
+}
+
+.search-item:last-child {
+  margin-bottom: 0;
+}
+
+.search-label {
+  display: block;
+  font-size: 0.7rem;
+  color: rgba(147, 197, 253, 0.7);
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.search-content {
+  font-size: 0.75rem;
+  color: rgba(148, 163, 184, 0.85);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: rgba(15, 23, 42, 0.4);
+  padding: 8px 10px;
+  border-radius: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
 /* 等待提示样式 */
 .speech-pending {
   display: flex;

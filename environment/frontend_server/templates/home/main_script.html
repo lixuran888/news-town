@@ -762,25 +762,25 @@
 			// 显示思考过程（如果有）
 			if (sp.reasoning && Object.keys(sp.reasoning).length > 0) {
 				var r = sp.reasoning;
-				html += '<details class="reasoning-section">';
-				html += '<summary class="reasoning-toggle">💭 查看思考依据</summary>';
-				html += '<div class="reasoning-content">';
+				// 显示搜索/思考依据（灰色小字，在正式发言之前）
+				html += '<div class="search-context">';
+				html += '<div class="search-context-header">📋 信息检索与思考依据</div>';
 				if (r.memory) {
-					html += '<div class="reasoning-item"><strong>📝 长期记忆:</strong><pre>' + escapeHtml(r.memory) + '</pre></div>';
+					html += '<div class="search-item"><span class="search-label">📝 长期记忆检索:</span><div class="search-content">' + escapeHtml(r.memory) + '</div></div>';
 				}
 				if (r.case_knowledge) {
-					html += '<div class="reasoning-item"><strong>📚 案例知识:</strong><pre>' + escapeHtml(r.case_knowledge) + '</pre></div>';
+					html += '<div class="search-item"><span class="search-label">📚 案例知识库:</span><div class="search-content">' + escapeHtml(r.case_knowledge) + '</div></div>';
 				}
 				if (r.rules) {
-					html += '<div class="reasoning-item"><strong>📋 规则库:</strong><pre>' + escapeHtml(r.rules) + '</pre></div>';
+					html += '<div class="search-item"><span class="search-label">📋 规则库条文:</span><div class="search-content">' + escapeHtml(r.rules) + '</div></div>';
 				}
 				if (r.public_opinion) {
-					html += '<div class="reasoning-item"><strong>👥 公众舆论:</strong><pre>' + escapeHtml(r.public_opinion) + '</pre></div>';
+					html += '<div class="search-item"><span class="search-label">👥 公众舆论:</span><div class="search-content">' + escapeHtml(r.public_opinion) + '</div></div>';
 				}
 				if (r.web_search) {
-					html += '<div class="reasoning-item"><strong>🌐 网络搜索:</strong><pre>' + escapeHtml(r.web_search) + '</pre></div>';
+					html += '<div class="search-item"><span class="search-label">🌐 Tavily网络搜索:</span><div class="search-content">' + escapeHtml(r.web_search) + '</div></div>';
 				}
-				html += '</div></details>';
+				html += '</div>';
 			}
 			
 			// 如果是 summary，收集后续的 advice 一起显示

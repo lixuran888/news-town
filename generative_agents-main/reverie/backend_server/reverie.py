@@ -96,12 +96,8 @@ class ReverieServer:
     reverie_meta["fork_sim_code"] = fork_sim_code
     reverie_meta["step"] = 0
 
-    # 约定：只要是从 base_the_ville_clean fork 出来的世界线，
-    # 第一日的 curr_time 一律从晚上 22:40:00 开始。后续仍按
-    # sec_per_step 正常推进 24 小时，不受影响。
-    if reverie_meta.get("fork_sim_code") == "base_the_ville_clean":
-      date_str = reverie_meta.get("start_date", "February 13, 2023")
-      reverie_meta["curr_time"] = f"{date_str}, 22:40:00"
+    # 注意：不再强制覆盖时间，使用用户在 landing 页面设置的时间
+    # （时间已保存在 base_the_ville_clean/reverie/meta.json 的 curr_time 字段中）
 
     with open(f"{sim_folder}/reverie/meta.json", "w") as outfile: 
       outfile.write(json.dumps(reverie_meta, indent=2))
@@ -673,10 +669,10 @@ class ReverieServer:
             # 不让舆论模块的异常影响主循环
             pass
           
-          # 06:00 重置会议状态（新的一天开始）
-          if self.curr_time.hour == 6 and self.curr_time.minute == 0:
+          # 06:00~06:10 重置会议状态（新的一天开始，放宽时间窗口避免被跳过）
+          if self.curr_time.hour == 6 and self.curr_time.minute < 10:
             if self.meeting_triggered:
-              print(f"[Reverie] 06:00 重置会议状态")
+              print(f"[Reverie] 06:00 重置会议状态，下次23:00可再次触发")
               self.meeting_triggered = False
 
           int_counter -= 1

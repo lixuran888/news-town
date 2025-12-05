@@ -352,14 +352,14 @@ def expert_meeting_speech(persona,
   else:
     web_block = "(联网搜索暂无返回结果)"
 
-  # 构建思考依据（用于调试和显示）
+  # 构建思考依据（用于调试和显示）- 保存完整内容
   global _last_expert_reasoning
   _last_expert_reasoning = {
-    "memory": memory_block[:800] if len(memory_block) > 800 else memory_block,
-    "case_knowledge": case_block[:600] if len(case_block) > 600 else case_block,
-    "rules": rules_block[:500] if len(rules_block) > 500 else rules_block,
-    "public_opinion": opinion_block[:400] if len(opinion_block) > 400 else opinion_block,
-    "web_search": web_block[:600] if len(web_block) > 600 else web_block,
+    "memory": memory_block,
+    "case_knowledge": case_block,
+    "rules": rules_block,
+    "public_opinion": opinion_block,
+    "web_search": web_block,
   }
   
   # 打印思考过程日志
@@ -434,14 +434,14 @@ def market_supervision_expert_meeting_speech(persona,
   else:
     web_block = "(联网搜索暂无返回结果)"
 
-  # 保存思考过程到全局变量
+  # 保存思考过程到全局变量 - 保存完整内容
   global _last_expert_reasoning
   _last_expert_reasoning = {
-    "memory": memory_block[:800] if len(memory_block) > 800 else memory_block,
-    "case_knowledge": case_block[:600] if len(case_block) > 600 else case_block,
-    "rules": rules_block[:500] if len(rules_block) > 500 else rules_block,
-    "public_opinion": opinion_block[:400] if len(opinion_block) > 400 else opinion_block,
-    "web_search": web_block[:600] if len(web_block) > 600 else web_block,
+    "memory": memory_block,
+    "case_knowledge": case_block,
+    "rules": rules_block,
+    "public_opinion": opinion_block,
+    "web_search": web_block,
   }
 
   # 打印思考过程日志
@@ -515,14 +515,14 @@ def education_expert_meeting_speech(persona,
   else:
     web_block = "(联网搜索暂无返回结果)"
 
-  # 保存思考过程到全局变量
+  # 保存思考过程到全局变量 - 保存完整内容
   global _last_expert_reasoning
   _last_expert_reasoning = {
-    "memory": memory_block[:800] if len(memory_block) > 800 else memory_block,
-    "case_knowledge": case_block[:600] if len(case_block) > 600 else case_block,
-    "rules": rules_block[:500] if len(rules_block) > 500 else rules_block,
-    "public_opinion": opinion_block[:400] if len(opinion_block) > 400 else opinion_block,
-    "web_search": web_block[:600] if len(web_block) > 600 else web_block,
+    "memory": memory_block,
+    "case_knowledge": case_block,
+    "rules": rules_block,
+    "public_opinion": opinion_block,
+    "web_search": web_block,
   }
 
   # 打印思考过程日志
