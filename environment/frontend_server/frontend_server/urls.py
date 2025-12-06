@@ -23,6 +23,8 @@ from translator import views as translator_views
 
 urlpatterns = [
     url(r'^$', translator_views.landing, name='landing'),
+    url(r'^start_time_setup/$', translator_views.start_time_setup, name='start_time_setup'),
+    url(r'^check_start_time_configured/$', translator_views.check_start_time_configured, name='check_start_time_configured'),
     url(r'^simulator_home$', translator_views.home, name='home'),
     url(r'^demo/(?P<sim_code>[\w-]+)/(?P<step>[\w-]+)/(?P<play_speed>[\w-]+)/$', translator_views.demo, name='demo'),
     url(r'^replay/(?P<sim_code>[\w-]+)/(?P<step>[\w-]+)/$', translator_views.replay, name='replay'),

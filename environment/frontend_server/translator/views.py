@@ -22,6 +22,7 @@ from global_methods import *
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from .models import *
 from pathlib import Path
+from . import start_time_config
 
 # 情感分析模块
 try:
@@ -714,4 +715,112 @@ def post_online_opinion(request):
     
   except Exception as e:
     return JsonResponse({"error": str(e)}, status=500)
+
+
+# ============================================================================
+# 独立开始时间设置页面
+# ============================================================================
+
+def start_time_setup(request):
+  """
+  独立的开始时间设置页面
+  使用独立的 JSON 文件存储，不依赖 base_the_ville_clean 的 meta.json
+  """
+  error = None
+  message = None
+  current_start_date = None
+  current_curr_time = None
+  initial_date_iso = None
+  initial_time_iso = None
+  
+  # 读取当前配置
+  start_date, curr_time = start_time_config.load_start_time()
+  if start_date and curr_time:
+    current_start_date = start_date
+    current_curr_time = curr_time
+    try:
+      # 解析日期和时间，用于表单默认值
+      dt = datetime.datetime.strptime(curr_time, "%B %d, %Y, %H:%M:%S")
+      initial_date_iso = dt.strftime("%Y-%m-%d")
+      initial_time_iso = dt.strftime("%H:%M")
+    except:
+      # 如果读取失败，使用默认值
+      default_date, default_time = start_time_config.get_default_time()
+      try:
+        dt = datetime.datetime.strptime(default_time, "%B %d, %Y, %H:%M:%S")
+        initial_date_iso = dt.strftime("%Y-%m-%d")
+        initial_time_iso = dt.strftime("%H:%M")
+      except:
+        initial_date_iso = "2023-02-13"
+        initial_time_iso = "00:00"
+  else:
+    # 如果没有配置，使用默认值
+    default_date, default_time = start_time_config.get_default_time()
+    try:
+      dt = datetime.datetime.strptime(default_time, "%B %d, %Y, %H:%M:%S")
+      initial_date_iso = dt.strftime("%Y-%m-%d")
+      initial_time_iso = dt.strftime("%H:%M")
+    except:
+      initial_date_iso = "2023-02-13"
+      initial_time_iso = "00:00"
+  
+  # 处理 POST 请求：保存开始时间
+  if request.method == "POST":
+    try:
+      start_date_str = request.POST.get("start_date", "").strip()
+      start_time_str = request.POST.get("start_time", "00:00").strip()
+      
+      if not start_date_str:
+        error = "请选择开始日期"
+      else:
+        # 解析表单提交的日期时间（YYYY-MM-DD 和 HH:MM 格式）
+        date_part = datetime.datetime.strptime(start_date_str, "%Y-%m-%d")
+        time_part = datetime.datetime.strptime(start_time_str, "%H:%M") if start_time_str else datetime.datetime.strptime("00:00", "%H:%M")
+        
+        # 转换为项目使用的格式
+        formatted_date = date_part.strftime("%B %d, %Y")  # "February 13, 2023"
+        formatted_time = time_part.strftime("%H:%M:%S")   # "17:00:00"
+        formatted_curr_time = f"{formatted_date}, {formatted_time}"
+        
+        # 保存到独立配置文件
+        if start_time_config.save_start_time(formatted_date, formatted_curr_time):
+          # 保存成功后重定向到 simulator_home
+          return redirect('home')
+        else:
+          error = "保存失败，请检查文件权限"
+        
+    except ValueError as e:
+      error = f"日期时间格式错误：{str(e)}"
+    except Exception as e:
+      error = f"保存失败：{str(e)}"
+      import traceback
+      print(f"[start_time_setup] Error: {traceback.format_exc()}")
+  
+  context = {
+    "current_start_date": current_start_date,
+    "current_curr_time": current_curr_time,
+    "initial_date_iso": initial_date_iso or "2023-02-13",
+    "initial_time_iso": initial_time_iso or "00:00",
+    "error": error,
+    "message": message,
+  }
+  template = "start_time_setup/start_time_setup.html"
+  return render(request, template, context)
+
+
+@csrf_exempt
+def check_start_time_configured(request):
+  """检查开始时间是否已配置（用于启动脚本）"""
+  start_date, curr_time = start_time_config.load_start_time()
+  if start_date and curr_time:
+    return JsonResponse({
+      "configured": True,
+      "start_date": start_date,
+      "curr_time": curr_time
+    })
+  else:
+    return JsonResponse({
+      "configured": False,
+      "message": "开始时间未配置"
+    })
 

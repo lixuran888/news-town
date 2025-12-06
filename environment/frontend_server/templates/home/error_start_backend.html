@@ -4,18 +4,20 @@
 {% block content %}
 <div style="display: flex; justify-content: center; align-items: center; height: 80vh; flex-direction: column;">
   <div style="text-align: center; padding: 40px; background-color: #f8f9fa; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 500px;">
-    <h2 style="color: #dc3545; margin-bottom: 20px;">⚠️ 后端未启动</h2>
-    <p style="font-size: 18px; color: #333; margin-bottom: 10px;">Please start the backend first.</p>
-    <p style="font-size: 14px; color: #666; margin-top: 20px; margin-bottom: 10px;">请先启动后端服务（运行 run_project.bat），然后刷新此页面。</p>
+    <h2 style="color: #ffc107; margin-bottom: 20px;">⏳ 等待后端启动</h2>
+    <p style="font-size: 18px; color: #333; margin-bottom: 10px;">时间已保存，后端正在自动启动</p>
+    <p style="font-size: 14px; color: #666; margin-top: 20px; margin-bottom: 10px;">后端启动完成后，此页面会自动刷新并显示仿真界面。</p>
     <div style="text-align: left; background-color: #fff; padding: 15px; border-radius: 4px; margin-top: 15px; font-size: 12px; color: #555;">
-      <strong>检查步骤：</strong><br>
-      1. 确认已运行 run_project.bat<br>
-      2. 检查批处理窗口是否显示"已启动"消息<br>
-      3. 如果后端启动失败，请查看批处理窗口的错误信息<br>
-      4. 等待几秒后刷新此页面
+      <strong>提示：</strong><br>
+      • 后端正在自动启动中，请稍候...<br>
+      • 此页面会自动刷新（约10秒）<br>
+      • 如果长时间未刷新，可以点击下方按钮手动刷新<br>
+      • 如果刚才您手动刷新了界面，请直接退出并重启该项目（运行run_project.bat）
     </div>
-    <p id="countdown" style="font-size: 12px; color: #999; margin-bottom: 15px;"></p>
-    <button onclick="location.reload()" style="padding: 10px 20px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">手动刷新</button>
+    <div style="margin-top: 15px;">
+      <button onclick="location.reload()" style="padding: 10px 20px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">手动刷新</button>
+    </div>
+    <p id="countdown" style="font-size: 12px; color: #999; margin-top: 15px; margin-bottom: 0;"></p>
   </div>
 </div>
 

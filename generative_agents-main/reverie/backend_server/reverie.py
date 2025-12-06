@@ -95,16 +95,26 @@ class ReverieServer:
     with open(f"{sim_folder}/reverie/meta.json") as json_file:  
       reverie_meta = json.load(json_file)
 
-    # 如果前端已经在 temp_storage/pending_start_time.json 中写入了新的起始时间，
-    # 在 fork 阶段就提前覆盖，避免“后端先 fork、前端后保存”导致的时间错位。
-    wait_seconds = int(os.getenv("START_TIME_WAIT_SECONDS", "6"))
-    override = self._wait_for_start_time_override(wait_seconds)
-    if override:
-      start_date, curr_time = override
-      reverie_meta["start_date"] = start_date
-      reverie_meta["curr_time"] = curr_time
-      self._start_time_override_applied = True
-      print(f"[Fork] 应用前端覆盖的开始时间：{start_date} / {curr_time}")
+    # 从独立的开始时间配置文件读取时间
+    # 配置文件路径: environment/frontend_server/temp_storage/start_time_config.json
+    start_time_config_file = os.path.join(fs_temp_storage, "start_time_config.json")
+    if os.path.exists(start_time_config_file):
+      try:
+        with open(start_time_config_file, 'r', encoding='utf-8') as f:
+          config_data = json.load(f)
+        start_date = config_data.get("start_date")
+        curr_time = config_data.get("curr_time")
+        if start_date and curr_time:
+          reverie_meta["start_date"] = start_date
+          reverie_meta["curr_time"] = curr_time
+          self._start_time_override_applied = True  # 标记已应用，避免后续重复应用
+          print(f"[Fork] 从独立配置文件读取开始时间：{start_date} / {curr_time}")
+        else:
+          print(f"[Fork] 配置文件存在但缺少必要字段，使用 meta.json 中的时间")
+      except Exception as e:
+        print(f"[Fork] 读取开始时间配置文件失败: {e}，使用 meta.json 中的时间")
+    else:
+      print(f"[Fork] 未找到开始时间配置文件 {start_time_config_file}，使用 meta.json 中的时间")
 
     # Fork 出新世界线时，不仅要记录 fork_sim_code，
     # 还要把 step 重置为 0，确保从 environment/0.json 开始推进。
@@ -940,16 +950,27 @@ class ReverieServer:
     """
     如果前端在 fork 之后才提交开始时间且当前还在 step 0，
     在第一次循环前补充覆盖，保证当轮运行采用新时间。
+    注意：现在使用独立的 start_time_config.json 文件
     """
     if self._start_time_override_applied:
       return
 
-    override_file = os.path.join(fs_temp_storage, "pending_start_time.json")
-    override = self._load_start_time_override(override_file)
-    if not override:
+    # 使用新的独立配置文件路径
+    config_file = os.path.join(fs_temp_storage, "start_time_config.json")
+    if not os.path.exists(config_file):
+      return
+    
+    try:
+      with open(config_file, 'r', encoding='utf-8') as f:
+        config_data = json.load(f)
+      start_date = config_data.get("start_date")
+      curr_time = config_data.get("curr_time")
+      if not start_date or not curr_time:
+        return
+    except Exception as e:
+      print(f"[Reverie] 读取开始时间配置文件失败: {e}")
       return
 
-    start_date, curr_time = override
     meta_path = os.path.join(sim_folder, "reverie", "meta.json")
     try:
       with open(meta_path, 'r', encoding='utf-8') as f:
