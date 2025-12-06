@@ -8,25 +8,14 @@
 	<div id="game-container" style="text-align: center"></div>
 
 	<div style="width:55%; margin: 0 auto; margin-top:4.5em">
-		<h3 style="margin-bottom:-0.5em; font-size:1.5em">Current Time:</h3>
-		<div class="row">
-			<div class="col-md-8" id="game-time" style="">
-				<h2><span id="game-time-content"></span></h2> 
-			</div>
-			<div class="col-md-4">
-				
-				<h2 style="text-align: right; {% if mode == 'simulate' %} display: none {% endif %}">
-					<button id="play_button" type="button" class="btn btn-default">
-				    <strong style=" font-size:1.2em"><i class="glyphicon glyphicon-play"></i> &nbsp;Play</strong>
-				  </button>
-				  
-				  <button id="pause_button" type="button" class="btn btn-default">
-				    <strong style=" font-size:1.2em"><i class="glyphicon glyphicon-pause"></i> &nbsp;Pause</strong>
-				  </button>
-
-				</h2>
-				
-			</div>
+		<div style="text-align: right; {% if mode == 'simulate' %} display: none {% endif %}">
+			<button id="play_button" type="button" class="btn btn-default">
+		    <strong style=" font-size:1.2em"><i class="glyphicon glyphicon-play"></i> &nbsp;Play</strong>
+		  </button>
+		  
+		  <button id="pause_button" type="button" class="btn btn-default">
+		    <strong style=" font-size:1.2em"><i class="glyphicon glyphicon-pause"></i> &nbsp;Pause</strong>
+		  </button>
 		</div>
 
 		<br>
@@ -34,34 +23,37 @@
 		<br>
 
 		{% for p_name, p_name_os in persona_names %}
-			<div class="media" style="background-color:#EEEEEE; padding:1em; padding-left:3.5em; padding-right:2em; border-radius:10px">
-			  <div class="media-left media-middle">
-			    <a href="#">
-			      <img class="media-object" src="{% static 'img/atlas.png' %}" style="width:5em">
-			    </a>
-			  </div>
-			  <div class="media-body" style='padding-left:3em; padding-top:0.5em; padding-bottom:1em'>
-			  	<div class="row">
-			    	<h2 class="col-md-8" id="name__{{ p_name_os }}" style="margin-bottom:0.8em; font-size:1.85em; ">
-			    		{{p_name}} &nbsp;&nbsp;
-			    		<button type="button" class="btn btn-sm btn-info state-details-btn" 
-			    		        data-persona-name="{{ p_name }}" 
-			    		        data-persona-name-os="{{ p_name_os }}" 
-			    		        data-sim-code="{{ sim_code }}" 
-			    		        data-step="{{ step }}"
-			    		        style="font-size:0.6em; padding: 2px 8px;">
-			    			State Details
-			    		</button>
-			    	</h2>
+			<div class="persona-card" style="background-color:#EEEEEE; padding:1em; padding-left:3.5em; padding-right:2em; border-radius:10px; margin-bottom:1em; cursor: pointer;" onclick="togglePersonaDetails('{{ p_name_os }}')">
+			  <div class="media">
+			    <div class="media-left media-middle">
+			      <a href="#" onclick="event.stopPropagation();">
+			        <img class="media-object" src="{% static 'img/atlas.png' %}" style="width:5em">
+			      </a>
 			    </div>
-			    <div style="">
-					  <p style="font-size:1.2em"><strong>Current Action:</strong> <br><span id="current_action__{{ p_name_os }}"></span></p>
-					  <p style="font-size:1.2em"><strong>Location:</strong> <br><span id="target_address__{{ p_name_os }}"></span></p>
-					  <p style="font-size:1.2em"><strong>Current Conversation:</strong> <br><span id="chat__{{ p_name_os }}"></span></p>
-					</div>
+			    <div class="media-body" style='padding-left:3em; padding-top:0.5em; padding-bottom:1em'>
+			    	<div class="row">
+			      	<h2 class="col-md-8" id="name__{{ p_name_os }}" style="margin-bottom:0.8em; font-size:1.85em; ">
+			      		{{p_name}} &nbsp;&nbsp;
+			      		<span class="persona-toggle-icon" id="toggle-icon-{{ p_name_os }}" style="font-size:0.8em; color:#666;">▼</span>
+			      		<button type="button" class="btn btn-sm btn-info state-details-btn" 
+			      		        data-persona-name="{{ p_name }}" 
+			      		        data-persona-name-os="{{ p_name_os }}" 
+			      		        data-sim-code="{{ sim_code }}" 
+			      		        data-step="{{ step }}"
+			      		        style="font-size:0.6em; padding: 2px 8px;"
+			      		        onclick="event.stopPropagation();">
+			      			状态详情
+			      		</button>
+			      	</h2>
+			      </div>
+			      <div class="persona-details" id="details-{{ p_name_os }}" style="display:none;">
+				      <p style="font-size:1.2em"><strong>当前行动:</strong> <br><span id="current_action__{{ p_name_os }}"></span></p>
+				      <p style="font-size:1.2em"><strong>位置:</strong> <br><span id="target_address__{{ p_name_os }}"></span></p>
+				      <p style="font-size:1.2em"><strong>当前对话:</strong> <br><span id="chat__{{ p_name_os }}"></span></p>
+				    </div>
+			    </div>
 			  </div>
 			</div>	
-			<br>
 		{% endfor %}
 
 
@@ -79,7 +71,7 @@
 <div style="padding-bottom:15em"> </div>
 
 
-<!-- Expert Meeting Modal -->
+<!-- Expert Meeting Modal - 木质风格 -->
 <div id="expert-meeting-overlay" class="expert-meeting-overlay" style="display:none;">
   <section class="expert-board-wrapper">
     <div class="expert-board">
@@ -107,7 +99,7 @@
 </div>
 
 <style>
-/* Expert Meeting Modal Styles */
+/* Expert Meeting Modal Styles - 统一为木质风格 */
 .expert-meeting-overlay {
   position: fixed;
   inset: 0;
@@ -132,16 +124,38 @@
   max-width: calc(100vw - 32px);
   height: calc(100vh - 30px);
   max-height: calc(100vh - 30px);
-  background: rgba(15, 23, 42, 0.95);
-  border-radius: 24px;
-  border: 1px solid rgba(147, 197, 253, 0.35);
-  box-shadow: 0 35px 80px rgba(2, 6, 23, 0.65);
-  padding: 24px 20px;
+  background: #D4A574;
+  border: 8px solid #8B6F47;
+  border-radius: 12px;
+  box-shadow: 
+      0 0 0 4px #A0826D,
+      0 8px 32px rgba(0, 0, 0, 0.5),
+      inset 0 2px 4px rgba(255, 255, 255, 0.2);
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  color: #e2e8f0;
-  font-family: "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+  overflow: hidden;
+  color: #3D2817;
+  font-family: 'Microsoft YaHei', Arial, sans-serif;
+}
+
+.expert-board::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: repeating-linear-gradient(
+      90deg,
+      transparent 0px,
+      transparent 18px,
+      #8B6F47 18px,
+      #8B6F47 22px
+  );
+  opacity: 0.3;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .expert-board-header {
@@ -151,17 +165,25 @@
   gap: 12px;
   user-select: none;
   cursor: grab;
+  background: linear-gradient(180deg, #A0826D 0%, #8B6F47 100%);
+  padding: 12px 15px;
+  border-bottom: 3px solid #6B4E3D;
+  position: relative;
+  z-index: 2;
 }
 
 .expert-board-title {
-  font-size: 1.2rem;
+  font-size: 16px;
   font-weight: 600;
+  color: #3D2817;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+  letter-spacing: 2px;
 }
 
 .expert-board-subtitle {
   display: block;
   font-size: 0.85rem;
-  color: rgba(226, 232, 240, 0.7);
+  color: #6B4E3D;
   margin-top: 4px;
 }
 
@@ -173,7 +195,7 @@
 
 .expert-board-round {
   font-size: 0.9rem;
-  color: rgba(226, 232, 240, 0.7);
+  color: #6B4E3D;
 }
 
 .expert-board-exit {
@@ -181,16 +203,16 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: rgba(239, 68, 68, 0.18);
-  color: #fecaca;
-  font-size: 1rem;
+  background: rgba(139, 111, 71, 0.5);
+  color: #3D2817;
+  font-size: 1.2rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s ease;
 }
 
 .expert-board-exit:hover {
-  background: rgba(239, 68, 68, 0.32);
+  background: rgba(139, 111, 71, 0.8);
 }
 
 .expert-stage {
@@ -200,22 +222,30 @@
   flex: 1;
   max-height: none;
   overflow-y: auto;
-  padding-right: 8px;
+  padding: 12px;
+  background: #E8D5B7;
+  scroll-behavior: smooth;
 }
 
 .expert-stage::-webkit-scrollbar {
-  width: 6px;
+  width: 10px;
+}
+
+.expert-stage::-webkit-scrollbar-track {
+  background: #D4A574;
+  border-radius: 5px;
 }
 
 .expert-stage::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.45);
-  border-radius: 999px;
+  background: #8B6F47;
+  border-radius: 5px;
+  border: 2px solid #D4A574;
 }
 
 .expert-waiting {
   text-align: center;
   padding: 40px 20px;
-  color: rgba(226, 232, 240, 0.8);
+  color: #8B6F47;
 }
 
 .expert-waiting-icon {
@@ -226,7 +256,7 @@
 
 .expert-waiting-hint {
   font-size: 0.85rem;
-  color: rgba(148, 163, 184, 0.6);
+  color: #6B4E3D;
   margin-top: 8px;
 }
 
@@ -236,20 +266,26 @@
 }
 
 .expert-card {
-  background: rgba(30, 41, 59, 0.8);
-  border-radius: 12px;
-  border: 1px solid rgba(147, 197, 253, 0.25);
-  padding: 16px;
-  animation: slideIn 0.4s ease forwards;
+  background: #F5E6D3;
+  border-radius: 6px;
+  border-left: 4px solid #8B6F47;
+  padding: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  animation: forumFadeIn 0.3s ease-in;
 }
 
-.expert-card.expert-health { border-left: 3px solid #60a5fa; }
-.expert-card.expert-market { border-left: 3px solid #f8fafc; }
-.expert-card.expert-education { border-left: 3px solid #f87171; }
-.expert-card.expert-moderator { border-left: 3px solid #bef264; }
+.expert-card.expert-health { border-left: 4px solid #60a5fa; }
+.expert-card.expert-market { border-left: 4px solid #8B6F47; }
+.expert-card.expert-education { border-left: 4px solid #f87171; }
+.expert-card.expert-moderator { border-left: 4px solid #bef264; }
 
 @keyframes slideIn {
   from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes forumFadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -258,22 +294,27 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px dashed #8B6F47;
 }
 
 .expert-card-name {
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 13px;
+  color: #6B4E3D;
 }
 
 .expert-card-role {
-  font-size: 0.8rem;
-  color: rgba(148, 163, 184, 0.8);
+  font-size: 11px;
+  color: #8B6F47;
+  font-weight: normal;
 }
 
 .expert-card-content {
-  font-size: 0.95rem;
+  font-size: 12px;
   line-height: 1.5;
-  color: rgba(226, 232, 240, 0.9);
+  color: #3D2817;
+  word-wrap: break-word;
 }
 
 .expert-thinking-indicator {
@@ -296,60 +337,63 @@
 }
 
 .speech-item {
-  background: rgba(30, 41, 59, 0.8);
-  border-radius: 12px;
-  border: 1px solid rgba(147, 197, 253, 0.2);
-  padding: 14px;
-  animation: slideIn 0.3s ease forwards;
+  background: #F5E6D3;
+  border-radius: 6px;
+  border-left: 4px solid #8B6F47;
+  padding: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  animation: forumFadeIn 0.3s ease-in;
+  margin-bottom: 12px;
 }
 
 .speech-item.speech-opening {
-  border-left: 3px solid #bef264;
-  background: rgba(190, 242, 100, 0.08);
+  border-left: 4px solid #bef264;
+  background: #F5E6D3;
 }
 
 .speech-item.speech-question {
-  border-left: 3px solid #60a5fa;
-  background: rgba(96, 165, 250, 0.08);
+  border-left: 4px solid #60a5fa;
+  background: #F5E6D3;
 }
 
 .speech-item.speech-summary {
-  border-left: 3px solid #f472b6;
-  background: rgba(244, 114, 182, 0.08);
+  border-left: 4px solid #f472b6;
+  background: #F5E6D3;
 }
 
 .speech-item.speech-feedback {
-  border-left: 3px solid #fbbf24;
-  background: rgba(251, 191, 36, 0.08);
-  font-size: 0.9rem;
-  padding: 10px 14px;
+  border-left: 4px solid #fbbf24;
+  background: #F5E6D3;
+  font-size: 12px;
+  padding: 10px;
 }
 
 .speech-item.speech-advice {
-  border-left: 3px solid #a78bfa;
-  background: rgba(167, 139, 250, 0.1);
-  font-size: 0.9rem;
-  padding: 12px 14px;
+  border-left: 4px solid #a78bfa;
+  background: #F5E6D3;
+  font-size: 12px;
+  padding: 10px;
 }
 
-/* 思考过程样式 */
+/* 思考过程样式 - 木质风格 */
 .reasoning-section {
   margin: 8px 0;
-  background: rgba(30, 41, 59, 0.8);
-  border-radius: 8px;
+  background: #E8D5B7;
+  border-radius: 6px;
   padding: 4px;
+  border-left: 2px solid #8B6F47;
 }
 
 .reasoning-toggle {
   cursor: pointer;
   padding: 8px 12px;
-  color: #94a3b8;
-  font-size: 0.85rem;
+  color: #6B4E3D;
+  font-size: 11px;
   user-select: none;
 }
 
 .reasoning-toggle:hover {
-  color: #e2e8f0;
+  color: #3D2817;
 }
 
 .reasoning-content {
@@ -360,7 +404,7 @@
 
 .reasoning-item {
   margin-bottom: 12px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  border-bottom: 1px dashed #8B6F47;
   padding-bottom: 8px;
 }
 
@@ -371,19 +415,19 @@
 
 .reasoning-item strong {
   display: block;
-  color: #93c5fd;
-  font-size: 0.8rem;
+  color: #6B4E3D;
+  font-size: 11px;
   margin-bottom: 4px;
 }
 
 .reasoning-item pre {
-  font-size: 0.75rem;
-  color: #cbd5e1;
+  font-size: 10px;
+  color: #3D2817;
   white-space: pre-wrap;
   word-break: break-word;
   margin: 0;
   font-family: "Consolas", "Monaco", monospace;
-  background: rgba(15, 23, 42, 0.5);
+  background: #F5E6D3;
   padding: 8px;
   border-radius: 4px;
   max-height: 150px;
@@ -399,41 +443,42 @@
 
 .speech-role {
   font-weight: 600;
-  font-size: 0.95rem;
-  color: #e2e8f0;
+  font-size: 13px;
+  color: #6B4E3D;
 }
 
 .speech-type {
-  font-size: 0.75rem;
-  color: rgba(148, 163, 184, 0.8);
-  background: rgba(148, 163, 184, 0.15);
+  font-size: 10px;
+  color: #8B6F47;
+  background: rgba(139, 111, 71, 0.15);
   padding: 2px 8px;
   border-radius: 4px;
 }
 
 .speech-content {
-  font-size: 0.95rem;
-  line-height: 1.6;
-  color: rgba(226, 232, 240, 0.9);
+  font-size: 12px;
+  line-height: 1.5;
+  color: #3D2817;
   white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 /* 搜索/思考依据样式（灰色小字，显示在正式发言之前） */
 .search-context {
-  background: rgba(30, 41, 59, 0.6);
-  border-radius: 8px;
-  padding: 12px;
+  background: #E8D5B7;
+  border-radius: 6px;
+  padding: 10px;
   margin-bottom: 12px;
-  border-left: 2px solid rgba(148, 163, 184, 0.3);
+  border-left: 2px solid #8B6F47;
 }
 
 .search-context-header {
-  font-size: 0.75rem;
-  color: rgba(148, 163, 184, 0.8);
+  font-size: 10px;
+  color: #6B4E3D;
   font-weight: 600;
-  margin-bottom: 10px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px dashed #8B6F47;
 }
 
 .search-item {
@@ -446,19 +491,19 @@
 
 .search-label {
   display: block;
-  font-size: 0.8rem;
-  color: rgba(147, 197, 253, 0.7);
+  font-size: 11px;
+  color: #6B4E3D;
   font-weight: 500;
   margin-bottom: 4px;
 }
 
 .search-content {
-  font-size: 0.85rem;
-  color: rgba(148, 163, 184, 0.85);
+  font-size: 11px;
+  color: #3D2817;
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
-  background: rgba(15, 23, 42, 0.4);
+  background: #F5E6D3;
   padding: 8px 10px;
   border-radius: 4px;
   max-height: 200px;
@@ -471,17 +516,17 @@
 }
 
 .search-content::-webkit-scrollbar-track {
-  background: rgba(30, 41, 59, 0.5);
+  background: #D4A574;
   border-radius: 3px;
 }
 
 .search-content::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.5);
+  background: #8B6F47;
   border-radius: 3px;
 }
 
 .search-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.7);
+  background: #6B4E3D;
 }
 
 /* 等待提示样式 */
@@ -489,12 +534,13 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 16px;
+  padding: 12px;
   color: #60a5fa;
-  font-size: 0.95rem;
-  background: rgba(96, 165, 250, 0.08);
-  border-radius: 8px;
+  font-size: 12px;
+  background: #F5E6D3;
+  border-radius: 6px;
   margin-top: 8px;
+  border-left: 4px solid #60a5fa;
 }
 
 .pending-dot {
@@ -512,22 +558,24 @@
 }
 
 .speech-completed {
-  padding: 12px 16px;
+  padding: 12px;
   color: #4ade80;
-  font-size: 0.9rem;
-  background: rgba(74, 222, 128, 0.08);
-  border-radius: 8px;
+  font-size: 12px;
+  background: #F5E6D3;
+  border-radius: 6px;
   margin-top: 8px;
   text-align: center;
+  border-left: 4px solid #4ade80;
 }
 
 .speech-error {
-  padding: 12px 16px;
+  padding: 12px;
   color: #f87171;
-  font-size: 0.9rem;
-  background: rgba(248, 113, 113, 0.08);
-  border-radius: 8px;
+  font-size: 12px;
+  background: #F5E6D3;
+  border-radius: 6px;
   margin-top: 8px;
+  border-left: 4px solid #f87171;
 }
 </style>
 
@@ -815,6 +863,39 @@ function renderPersonaState(data) {
     margin: 0;
 }
 
+/* 当前时间区域 - 整合到社区聊天室中 */
+.forum-time-section {
+    padding: 12px 15px;
+    background: #C9976B;
+    border-bottom: 2px solid #8B6F47;
+    text-align: center;
+}
+
+.forum-time-label {
+    font-size: 11px;
+    color: #6B4E3D;
+    margin-bottom: 4px;
+}
+
+.forum-time-display {
+    color: #3D2817;
+    font-weight: bold;
+    line-height: 1.4;
+}
+
+/* 游戏时间显示格式：两行显示 */
+.game-time-date {
+    font-size: 14px;
+    color: #3D2817;
+    margin-bottom: 4px;
+}
+
+.game-time-clock {
+    font-size: 22px;
+    color: #3D2817;
+    font-weight: bold;
+}
+
 .forum-stats {
     display: flex;
     justify-content: space-around;
@@ -919,11 +1000,36 @@ function renderPersonaState(data) {
     font-size: 40px;
     margin-bottom: 10px;
 }
+
+
+/* Agent列表折叠样式 */
+.persona-card {
+    transition: background-color 0.2s ease;
+}
+
+.persona-card:hover {
+    background-color: #DDDDDD !important;
+}
+
+.persona-toggle-icon {
+    transition: transform 0.3s ease;
+    display: inline-block;
+}
+
+.persona-card.expanded .persona-toggle-icon {
+    transform: rotate(180deg);
+}
 </style>
 
 <div class="online-forum-container">
     <div class="forum-header">
         <h2>💬 社区聊天室</h2>
+    </div>
+    
+    <!-- 当前时间显示 - 整合到社区聊天室中 -->
+    <div class="forum-time-section">
+        <div class="forum-time-label">🕐 当前时间</div>
+        <div class="forum-time-display" id="game-time-content">加载中...</div>
     </div>
     
     <div class="forum-stats">
@@ -1019,6 +1125,23 @@ function renderPersonaState(data) {
     // 暴露刷新函数，供外部调用（当有新帖子时）
     window.refreshForumPosts = loadForumPosts;
 })();
+
+// Agent列表折叠功能
+function togglePersonaDetails(personaNameOs) {
+    const details = document.getElementById('details-' + personaNameOs);
+    const icon = document.getElementById('toggle-icon-' + personaNameOs);
+    const card = details.closest('.persona-card');
+    
+    if (details.style.display === 'none') {
+        details.style.display = 'block';
+        icon.textContent = '▲';
+        card.classList.add('expanded');
+    } else {
+        details.style.display = 'none';
+        icon.textContent = '▼';
+        card.classList.remove('expanded');
+    }
+}
 </script>
 
 {% endblock js_content %}

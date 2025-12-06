@@ -432,7 +432,37 @@
 	    // The execute_count_max is computed by tile_width/movement_speed, which
 	    // defines a one step sequence in this world. 
 	    const currTimeStr = execute_movement["meta"]["curr_time"];
-	    document.getElementById("game-time-content").innerHTML = currTimeStr;
+	    // 格式化时间：第一行 YYYY-MM-DD，第二行 hh:mm:ss
+	    try {
+	      // 解析 "February 13, 2023, 17:00:00" 格式
+	      const timeMatch = currTimeStr.match(/(\w+) (\d+), (\d+), (\d{2}):(\d{2}):(\d{2})/);
+	      if (timeMatch) {
+	        const monthNames = ["January", "February", "March", "April", "May", "June",
+	                          "July", "August", "September", "October", "November", "December"];
+	        const monthName = timeMatch[1];
+	        const day = timeMatch[2].padStart(2, '0');
+	        const year = timeMatch[3];
+	        const hour = timeMatch[4];
+	        const minute = timeMatch[5];
+	        const second = timeMatch[6];
+	        
+	        const monthIndex = monthNames.indexOf(monthName);
+	        const month = (monthIndex + 1).toString().padStart(2, '0');
+	        
+	        const dateStr = `${year}-${month}-${day}`;
+	        const timeStr = `${hour}:${minute}:${second}`;
+	        
+	        document.getElementById("game-time-content").innerHTML = 
+	          `<div class="game-time-date">${dateStr}</div>` +
+	          `<div class="game-time-clock">${timeStr}</div>`;
+	      } else {
+	        // 如果解析失败，显示原始字符串
+	        document.getElementById("game-time-content").innerHTML = currTimeStr;
+	      }
+	    } catch (e) {
+	      // 如果出错，显示原始字符串
+	      document.getElementById("game-time-content").innerHTML = currTimeStr;
+	    }
 	    // 根据当前模拟时间字符串切换日/夜滤镜
 	    (function () {
 	      try {
