@@ -186,17 +186,48 @@ class ReverieServer:
     # Loading in all personas. 
     init_env_file = f"{sim_folder}/environment/{str(self.step)}.json"
     init_env = json.load(open(init_env_file))
+    loaded_count = 0
+    failed_count = 0
+    
+    # 输出所有agent的初始位置信息
+    print(f"\n[Reverie] ========== Agent初始位置信息 ==========")
+    print(f"[Reverie] 环境文件: environment/{self.step}.json")
+    print(f"[Reverie] 配置的agent数量: {len(reverie_meta['persona_names'])}")
+    print(f"[Reverie] 环境文件中的agent数量: {len(init_env)}")
+    print(f"[Reverie] Agent初始位置列表:")
+    for persona_name in reverie_meta['persona_names']:
+      if persona_name in init_env:
+        p_x = init_env[persona_name].get("x", "N/A")
+        p_y = init_env[persona_name].get("y", "N/A")
+        maze = init_env[persona_name].get("maze", "N/A")
+        print(f"[Reverie]   - {persona_name}: 位置({p_x}, {p_y}), 地图({maze})")
+      else:
+        print(f"[Reverie]   - {persona_name}: ❌ 未在环境文件中找到")
+    print(f"[Reverie] ==========================================\n")
+    
     for persona_name in reverie_meta['persona_names']: 
       # 在某些场景下，meta.json 中列出的 persona 可能尚未在
       # environment/0.json 中配置初始位置（例如刚新增的专家）。
       # 为避免 KeyError，这里如果 init_env 中没有该 persona，就跳过。
       if persona_name not in init_env:
+        print(f"[Reverie] WARNING: {persona_name} 不在 environment/{self.step}.json 中，跳过")
+        failed_count += 1
         continue
 
-      persona_folder = f"{sim_folder}/personas/{persona_name}"
-      p_x = init_env[persona_name]["x"]
-      p_y = init_env[persona_name]["y"]
-      curr_persona = Persona(persona_name, persona_folder)
+      try:
+        persona_folder = f"{sim_folder}/personas/{persona_name}"
+        p_x = init_env[persona_name]["x"]
+        p_y = init_env[persona_name]["y"]
+        print(f"[Reverie] 正在加载 agent: {persona_name}...")
+        print(f"[Reverie]   初始位置: ({p_x}, {p_y})")
+        curr_persona = Persona(persona_name, persona_folder)
+        print(f"[Reverie] ✅ {persona_name} 加载成功")
+      except Exception as e:
+        print(f"[Reverie] ❌ {persona_name} 加载失败: {e}")
+        import traceback
+        traceback.print_exc()
+        failed_count += 1
+        continue
 
       # 每次 fork 新世界时，只继承身份和长期记忆，
       # 但当天状态 / 日程不应沿用旧世界，否则会出现“整天睡觉”的计划。
@@ -247,13 +278,34 @@ class ReverieServer:
         if old_chat_count > 0:
           print(f"[Fork] Cleared {old_chat_count} old chat memories from {persona_name}")
 
-      # 在初始化时为每个 persona 注入一次校园食物中毒事件的长期记忆
-      inject_food_poisoning_event(curr_persona, self.curr_time)
+      try:
+        # 在初始化时为每个 persona 注入一次校园食物中毒事件的长期记忆
+        inject_food_poisoning_event(curr_persona, self.curr_time)
 
-      self.personas[persona_name] = curr_persona
-      self.personas_tile[persona_name] = (p_x, p_y)
-      self.maze.tiles[p_y][p_x]["events"].add(curr_persona.scratch
-                                              .get_curr_event_and_desc())
+        self.personas[persona_name] = curr_persona
+        self.personas_tile[persona_name] = (p_x, p_y)
+        self.maze.tiles[p_y][p_x]["events"].add(curr_persona.scratch
+                                                .get_curr_event_and_desc())
+        loaded_count += 1
+      except Exception as e:
+        print(f"[Reverie] ❌ {persona_name} 初始化失败: {e}")
+        import traceback
+        traceback.print_exc()
+        failed_count += 1
+        # 如果初始化失败，从personas字典中移除（如果已添加）
+        if persona_name in self.personas:
+          del self.personas[persona_name]
+        if persona_name in self.personas_tile:
+          del self.personas_tile[persona_name]
+        continue
+    
+    # 输出加载统计
+    total_count = len(reverie_meta['persona_names'])
+    print(f"[Reverie] Agent加载完成: 成功 {loaded_count}/{total_count}, 失败 {failed_count}/{total_count}")
+    if loaded_count == 0:
+      print("[Reverie] ⚠️ 警告: 没有成功加载任何agent！")
+    elif failed_count > 0:
+      print(f"[Reverie] ⚠️ 警告: 有 {failed_count} 个agent加载失败")
 
     # REVERIE SETTINGS PARAMETERS:  
     # <server_sleep> denotes the amount of time that our while loop rests each

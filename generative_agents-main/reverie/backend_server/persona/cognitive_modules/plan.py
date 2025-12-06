@@ -114,11 +114,12 @@ def generate_hourly_schedule(persona, wake_up_hour):
                    "08:00 PM", "09:00 PM", "10:00 PM", "11:00 PM"]
   
   # ========== 快速测试模式（用完删除）==========
-  FAST_TEST_MODE = True
-  if FAST_TEST_MODE:
-    n_m1_activity = ["sleeping"] * wake_up_hour + ["idle"] * (24 - wake_up_hour)
-    print(f"[FastTest] {persona.scratch.name} 使用默认日程，跳过LLM")
-  else:
+  # FAST_TEST_MODE = True
+  # if FAST_TEST_MODE:
+  #   n_m1_activity = ["sleeping"] * wake_up_hour + ["idle"] * (24 - wake_up_hour)
+  #   print(f"[FastTest] {persona.scratch.name} 使用默认日程，跳过LLM")
+  # else:
+  if True:  # 注释掉快速测试模式，始终使用正常模式
     n_m1_activity = []
     diversity_repeat_count = 3
     
@@ -134,13 +135,29 @@ def generate_hourly_schedule(persona, wake_up_hour):
             n_m1_activity += ["sleeping"]
             temp_wake -= 1
           else: 
-            n_m1_activity += [run_gpt_prompt_generate_hourly_schedule(
-                            persona, curr_hour_str, n_m1_activity, hour_str_full)[0]]
+            try:
+              resp = run_gpt_prompt_generate_hourly_schedule(
+                      persona, curr_hour_str, n_m1_activity, hour_str_full)
+              if resp and len(resp) > 0:
+                n_m1_activity += [resp[0]]
+              else:
+                n_m1_activity += ["idle"]  # fallback
+            except Exception as e:
+              print(f"[Plan] WARNING: LLM调用失败 for {persona.scratch.name} at {curr_hour_str}: {e}")
+              n_m1_activity += ["idle"]  # fallback
         
         # 下午：12-24点（传入完整hour_str_full，让LLM知道这是同一天的延续）
         for curr_hour_str in hour_str_full[12:]: 
-          n_m1_activity += [run_gpt_prompt_generate_hourly_schedule(
-                          persona, curr_hour_str, n_m1_activity, hour_str_full)[0]]
+          try:
+            resp = run_gpt_prompt_generate_hourly_schedule(
+                    persona, curr_hour_str, n_m1_activity, hour_str_full)
+            if resp and len(resp) > 0:
+              n_m1_activity += [resp[0]]
+            else:
+              n_m1_activity += ["idle"]  # fallback
+          except Exception as e:
+            print(f"[Plan] WARNING: LLM调用失败 for {persona.scratch.name} at {curr_hour_str}: {e}")
+            n_m1_activity += ["idle"]  # fallback
     
     print(f"✅ {persona.scratch.name} 日程生成完成：共{len(n_m1_activity)}小时")
   
@@ -760,13 +777,13 @@ def _long_term_planning(persona, new_day):
              create the personas' long term planning on the new day. 
   """
   # ========== 快速测试模式（用完删除）==========
-  FAST_TEST_MODE = True
-  if FAST_TEST_MODE:
-    wake_up_hour = 8
-    persona.scratch.daily_req = ["wake up at 8am", "idle during day", "attend meeting at 11pm"]
-    persona.scratch.f_daily_schedule = generate_hourly_schedule(persona, wake_up_hour)
-    print(f"[FastTest] {persona.scratch.name} 完成快速初始化")
-    return
+  # FAST_TEST_MODE = True
+  # if FAST_TEST_MODE:
+  #   wake_up_hour = 8
+  #   persona.scratch.daily_req = ["wake up at 8am", "idle during day", "attend meeting at 11pm"]
+  #   persona.scratch.f_daily_schedule = generate_hourly_schedule(persona, wake_up_hour)
+  #   print(f"[FastTest] {persona.scratch.name} 完成快速初始化")
+  #   return
   # ========== 快速测试模式结束 ==========
   
   # We start by creating the wake up hour for the persona. 
@@ -1013,21 +1030,22 @@ def _determine_action(persona, maze):
     act_desp, act_dura = persona.scratch.f_daily_schedule[curr_index]
 
   # ========== 快速测试模式：跳过所有LLM调用 ==========
-  FAST_TEST_MODE = True
-  if FAST_TEST_MODE:
-    curr_tile = persona.scratch.curr_tile
-    tile_info = maze.access_tile(curr_tile)
-    act_world = tile_info["world"]
-    act_sector = tile_info["sector"]
-    act_arena = tile_info["arena"]
-    new_address = f"{act_world}:{act_sector}:{act_arena}:<random>"
-    act_pron = "🚶"
-    act_event = (persona.scratch.name, "is", act_desp)
-    act_obj_desp = f"idle"
-    act_obj_pron = "⏳"
-    act_obj_event = ("object", "is", "idle")
-    print(f"[FastTest] {persona.scratch.name}: {act_desp[:30]}... @ {act_sector}")
-  else:
+  # FAST_TEST_MODE = True
+  # if FAST_TEST_MODE:
+  #   curr_tile = persona.scratch.curr_tile
+  #   tile_info = maze.access_tile(curr_tile)
+  #   act_world = tile_info["world"]
+  #   act_sector = tile_info["sector"]
+  #   act_arena = tile_info["arena"]
+  #   new_address = f"{act_world}:{act_sector}:{act_arena}:<random>"
+  #   act_pron = "🚶"
+  #   act_event = (persona.scratch.name, "is", act_desp)
+  #   act_obj_desp = f"idle"
+  #   act_obj_pron = "⏳"
+  #   act_obj_event = ("object", "is", "idle")
+  #   print(f"[FastTest] {persona.scratch.name}: {act_desp[:30]}... @ {act_sector}")
+  # else:
+  if True:  # 注释掉快速测试模式，始终使用正常模式
     # Finding the target location of the action and creating action-related
     # variables.
     act_world = maze.access_tile(persona.scratch.curr_tile)["world"]
