@@ -2,22 +2,116 @@
 {% load staticfiles %}
 
 {% block content %}
-<div style="display: flex; justify-content: center; align-items: center; height: 80vh; flex-direction: column;">
-  <div style="text-align: center; padding: 40px; background-color: #f8f9fa; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 500px;">
-    <h2 style="color: #ffc107; margin-bottom: 20px;">⏳ 等待后端启动</h2>
-    <p style="font-size: 18px; color: #333; margin-bottom: 10px;">时间已保存，后端正在自动启动</p>
-    <p style="font-size: 14px; color: #666; margin-top: 20px; margin-bottom: 10px;">后端启动完成后，此页面会自动刷新并显示仿真界面。</p>
-    <div style="text-align: left; background-color: #fff; padding: 15px; border-radius: 4px; margin-top: 15px; font-size: 12px; color: #555;">
+<style>
+.error-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 80vh;
+    flex-direction: column;
+}
+
+.error-panel {
+    text-align: center;
+    padding: 40px;
+    background: #D4A574;
+    border: 8px solid #8B6F47;
+    border-radius: 12px;
+    max-width: 500px;
+    font-family: 'Microsoft YaHei', Arial, sans-serif;
+}
+
+.error-header {
+    background: linear-gradient(180deg, #A0826D 0%, #8B6F47 100%);
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin: -40px -40px 25px -40px;
+    border-bottom: 3px solid #6B4E3D;
+}
+
+.error-header h2 {
+    color: #FFF8E7;
+    font-weight: bold;
+    margin: 0;
+    font-size: 24px;
+}
+
+.error-content {
+    color: #3D2817;
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+.error-hint {
+    font-size: 14px;
+    color: #6B4E3D;
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+.error-info {
+    text-align: left;
+    background-color: #E8D5B7;
+    padding: 15px;
+    border-radius: 6px;
+    margin-top: 15px;
+    font-size: 12px;
+    color: #3D2817;
+    border-left: 4px solid #8B6F47;
+}
+
+.error-info strong {
+    color: #6B4E3D;
+}
+
+.error-button {
+    margin-top: 15px;
+}
+
+.error-button button {
+    padding: 10px 20px;
+    font-size: 16px;
+    background: #8B6F47;
+    color: #FFF8E7;
+    border: 2px solid #6B4E3D;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s ease;
+    font-family: 'Microsoft YaHei', Arial, sans-serif;
+}
+
+.error-button button:hover {
+    background: #6B4E3D;
+    border-color: #3D2817;
+}
+
+.countdown {
+    font-size: 12px;
+    color: #6B4E3D;
+    margin-top: 15px;
+    margin-bottom: 0;
+}
+</style>
+
+<div class="error-container">
+  <div class="error-panel">
+    <div class="error-header">
+      <h2>⏳ 等待后端启动</h2>
+    </div>
+    <p class="error-content">时间已保存，后端正在自动启动</p>
+    <p class="error-hint">后端启动完成后，此页面会自动刷新并显示仿真界面。</p>
+    <div class="error-info">
       <strong>提示：</strong><br>
       • 后端正在自动启动中，请稍候...<br>
       • 此页面会自动刷新（约10秒）<br>
       • 如果长时间未刷新，可以点击下方按钮手动刷新<br>
       • 如果刚才您手动刷新了界面，请直接退出并重启该项目（运行run_project.bat）
     </div>
-    <div style="margin-top: 15px;">
-      <button onclick="location.reload()" style="padding: 10px 20px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">手动刷新</button>
+    <div class="error-button">
+      <button onclick="location.reload()">手动刷新</button>
     </div>
-    <p id="countdown" style="font-size: 12px; color: #999; margin-top: 15px; margin-bottom: 0;"></p>
+    <p id="countdown" class="countdown"></p>
   </div>
 </div>
 

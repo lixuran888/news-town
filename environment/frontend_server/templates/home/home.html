@@ -2,73 +2,53 @@
 {% load staticfiles %}
 
 {% block content %}
-<br>
-<br>
-<div>
-	<div id="game-container" style="text-align: center"></div>
-
-	<div style="width:55%; margin: 0 auto; margin-top:4.5em">
-		<div style="text-align: right; {% if mode == 'simulate' %} display: none {% endif %}">
-			<button id="play_button" type="button" class="btn btn-default">
-		    <strong style=" font-size:1.2em"><i class="glyphicon glyphicon-play"></i> &nbsp;Play</strong>
-		  </button>
-		  
-		  <button id="pause_button" type="button" class="btn btn-default">
-		    <strong style=" font-size:1.2em"><i class="glyphicon glyphicon-pause"></i> &nbsp;Pause</strong>
-		  </button>
-		</div>
-
-		<br>
-		<hr style="border-color:#999999">
-		<br>
-
-		{% for p_name, p_name_os in persona_names %}
-			<div class="persona-card" style="background-color:#EEEEEE; padding:1em; padding-left:3.5em; padding-right:2em; border-radius:10px; margin-bottom:1em; cursor: pointer;" onclick="togglePersonaDetails('{{ p_name_os }}')">
-			  <div class="media">
-			    <div class="media-left media-middle">
-			      <a href="#" onclick="event.stopPropagation();">
-			        <img class="media-object" src="{% static 'img/atlas.png' %}" style="width:5em">
-			      </a>
-			    </div>
-			    <div class="media-body" style='padding-left:3em; padding-top:0.5em; padding-bottom:1em'>
-			    	<div class="row">
-			      	<h2 class="col-md-8" id="name__{{ p_name_os }}" style="margin-bottom:0.8em; font-size:1.85em; ">
-			      		{{p_name}} &nbsp;&nbsp;
-			      		<span class="persona-toggle-icon" id="toggle-icon-{{ p_name_os }}" style="font-size:0.8em; color:#666;">▼</span>
-			      		<button type="button" class="btn btn-sm btn-info state-details-btn" 
-			      		        data-persona-name="{{ p_name }}" 
-			      		        data-persona-name-os="{{ p_name_os }}" 
-			      		        data-sim-code="{{ sim_code }}" 
-			      		        data-step="{{ step }}"
-			      		        style="font-size:0.6em; padding: 2px 8px;"
-			      		        onclick="event.stopPropagation();">
-			      			状态详情
-			      		</button>
-			      	</h2>
-			      </div>
-			      <div class="persona-details" id="details-{{ p_name_os }}" style="display:none;">
-				      <p style="font-size:1.2em"><strong>当前行动:</strong> <br><span id="current_action__{{ p_name_os }}"></span></p>
-				      <p style="font-size:1.2em"><strong>位置:</strong> <br><span id="target_address__{{ p_name_os }}"></span></p>
-				      <p style="font-size:1.2em"><strong>当前对话:</strong> <br><span id="chat__{{ p_name_os }}"></span></p>
-				    </div>
-			    </div>
-			  </div>
-			</div>	
-		{% endfor %}
-
-
-
-
-		
-
-	</div>
+<!-- 地图容器 - 固定在右侧，常驻显示 -->
+<div class="map-container">
+  <div class="map-header">
+    <h2>🗺️ 世界地图</h2>
+    <div class="map-controls" style="{% if mode == 'simulate' %} display: none {% endif %}">
+      <button id="play_button" type="button" class="btn btn-xs btn-default" style="margin-right: 5px;">
+        <i class="glyphicon glyphicon-play"></i> Play
+      </button>
+      <button id="pause_button" type="button" class="btn btn-xs btn-default">
+        <i class="glyphicon glyphicon-pause"></i> Pause
+      </button>
+    </div>
+  </div>
+  <div class="map-content">
+    <div id="game-container" style="text-align: center; width: 100%; height: 100%;"></div>
+  </div>
 </div>
 
-  
-
-
-
-<div style="padding-bottom:15em"> </div>
+<!-- Agent 状态栏 - 固定在页面底部 -->
+<div class="agent-status-bar">
+	<div class="status-bar-content">
+		{% for p_name, p_name_os in persona_names %}
+			<div class="agent-status-item" onclick="togglePersonaDetails('{{ p_name_os }}')">
+				<span class="agent-status-name" id="name__{{ p_name_os }}">{{p_name}}</span>
+				<button type="button" class="btn btn-xs btn-info state-details-btn" 
+				        data-persona-name="{{ p_name }}" 
+				        data-persona-name-os="{{ p_name_os }}" 
+				        data-sim-code="{{ sim_code }}" 
+				        data-step="{{ step }}"
+				        style="font-size:0.7em; padding: 1px 6px; margin-left: 4px;"
+				        onclick="event.stopPropagation();">
+					详情
+				</button>
+			</div>
+		{% endfor %}
+	</div>
+	<!-- 详细信息面板（可展开） -->
+	{% for p_name, p_name_os in persona_names %}
+		<div class="persona-details-panel" id="details-{{ p_name_os }}" style="display:none;">
+			<div class="details-panel-content">
+				<p><strong>当前行动:</strong> <span id="current_action__{{ p_name_os }}"></span></p>
+				<p><strong>位置:</strong> <span id="target_address__{{ p_name_os }}"></span></p>
+				<p><strong>当前对话:</strong> <span id="chat__{{ p_name_os }}"></span></p>
+			</div>
+		</div>
+	{% endfor %}
+</div>
 
 
 <!-- Expert Meeting Modal - 木质风格 -->
@@ -99,6 +79,95 @@
 </div>
 
 <style>
+/* 地图容器 - 固定在右侧，常驻显示，木质风格 */
+.map-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: calc(100vw - 252px - 60px); /* 聊天室252px + 左边距20px + 右边距20px + 中间间距20px */
+    max-width: calc(100vw - 312px);
+    height: calc(100vh - 120px); /* 留出顶部和底部空间 */
+    max-height: calc(100vh - 120px);
+    background: #D4A574;
+    border: 8px solid #8B6F47;
+    border-radius: 12px;
+    box-shadow: none;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 1001;
+    font-family: 'Microsoft YaHei', Arial, sans-serif;
+}
+
+.map-header {
+    background: linear-gradient(180deg, #A0826D 0%, #8B6F47 100%);
+    padding: 12px 15px;
+    border-bottom: 3px solid #6B4E3D;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.map-header h2 {
+    color: #FFF8E7; /* 米白色 */
+    font-size: 16px;
+    font-weight: bold; /* 粗体 */
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+    letter-spacing: 2px;
+    margin: 0;
+    flex: 1;
+}
+
+.map-controls {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.map-content {
+    flex: 1;
+    overflow: auto;
+    padding: 10px;
+    background: #E8D5B7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.map-content::-webkit-scrollbar {
+    width: 10px;
+}
+
+.map-content::-webkit-scrollbar-track {
+    background: #D4A574;
+    border-radius: 5px;
+}
+
+.map-content::-webkit-scrollbar-thumb {
+    background: #8B6F47;
+    border-radius: 5px;
+    border: 2px solid #D4A574;
+}
+
+#game-container {
+    width: 100% !important;
+    height: 100% !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#game-container canvas {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
 /* Expert Meeting Modal Styles - 统一为木质风格 */
 .expert-meeting-overlay {
   position: fixed;
@@ -107,8 +176,9 @@
   z-index: 2000;
   display: flex;
   justify-content: flex-end;
-  align-items: center;
+  align-items: flex-start; /* 向上对齐 */
   padding-right: 20px;
+  padding-top: 20px; /* 顶部间距 */
 }
 
 .expert-board-wrapper {
@@ -122,14 +192,14 @@
 .expert-board {
   width: 420px;
   max-width: calc(100vw - 32px);
-  height: calc(100vh - 30px);
-  max-height: calc(100vh - 30px);
-  background: #D4A574;
+  height: calc(100vh - 120px); /* 和地图高度一致 */
+  max-height: calc(100vh - 120px);
+  background: #F5F5DC; /* 浅色米白色 */
   border: 8px solid #8B6F47;
   border-radius: 12px;
   box-shadow: 
       0 0 0 4px #A0826D,
-      0 8px 32px rgba(0, 0, 0, 0.5),
+      0 4px 16px rgba(0, 0, 0, 0.3),
       inset 0 2px 4px rgba(255, 255, 255, 0.2);
   padding: 0;
   display: flex;
@@ -139,24 +209,6 @@
   font-family: 'Microsoft YaHei', Arial, sans-serif;
 }
 
-.expert-board::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 40px;
-  background: repeating-linear-gradient(
-      90deg,
-      transparent 0px,
-      transparent 18px,
-      #8B6F47 18px,
-      #8B6F47 22px
-  );
-  opacity: 0.3;
-  pointer-events: none;
-  z-index: 1;
-}
 
 .expert-board-header {
   display: flex;
@@ -175,7 +227,7 @@
 .expert-board-title {
   font-size: 16px;
   font-weight: 600;
-  color: #3D2817;
+  color: #FFF8E7; /* 米白色 */
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
   letter-spacing: 2px;
 }
@@ -183,7 +235,7 @@
 .expert-board-subtitle {
   display: block;
   font-size: 0.85rem;
-  color: #6B4E3D;
+  color: #FFF8E7; /* 米白色 */
   margin-top: 4px;
 }
 
@@ -195,7 +247,7 @@
 
 .expert-board-round {
   font-size: 0.9rem;
-  color: #6B4E3D;
+  color: #FFF8E7; /* 米白色 */
 }
 
 .expert-board-exit {
@@ -270,7 +322,7 @@
   border-radius: 6px;
   border-left: 4px solid #8B6F47;
   padding: 10px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: none;
   animation: forumFadeIn 0.3s ease-in;
 }
 
@@ -341,7 +393,7 @@
   border-radius: 6px;
   border-left: 4px solid #8B6F47;
   padding: 10px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: none;
   animation: forumFadeIn 0.3s ease-in;
   margin-bottom: 12px;
 }
@@ -642,45 +694,10 @@ $(document).on('click', '.state-details-btn', function(e) {
   e.preventDefault();
   e.stopPropagation();
   
-  var personaName = $(this).data('persona-name');
   var personaNameOs = $(this).data('persona-name-os');
-  var simCode = $(this).data('sim-code');
-  var step = $(this).data('step');
   
-  console.log('State Details button clicked:', personaName, simCode, step);
-  
-  // 显示modal
-  $('#personaStateModal').modal('show');
-  
-  // 设置标题
-  $('#personaStateModalLabel').text(personaName + ' - State Details');
-  
-  // 重置内容为加载状态
-  $('#personaStateModalBody').html(
-    '<div class="text-center"><span class="glyphicon glyphicon-refresh glyphicon-spin"></span> 加载中...</div>'
-  );
-  
-  // 加载数据 - 构建URL
-  var url = '/replay_persona_state/' + simCode + '/' + step + '/' + personaNameOs + '/?format=json';
-  console.log('Loading URL:', url);
-  
-  $.ajax({
-    url: url,
-    type: 'GET',
-    headers: {
-      'X-Requested-With': 'XMLHttpRequest'
-    },
-    success: function(data) {
-      console.log('Data loaded successfully');
-      renderPersonaState(data);
-    },
-    error: function(xhr, status, error) {
-      console.error('Error loading data:', error, xhr);
-      $('#personaStateModalBody').html(
-        '<div class="alert alert-danger">加载失败: ' + error + ' (状态码: ' + xhr.status + ')</div>'
-      );
-    }
-  });
+  // 打开详情面板
+  togglePersonaDetails(personaNameOs);
 });
 
 function renderPersonaState(data) {
@@ -806,21 +823,53 @@ function renderPersonaState(data) {
 <!-- 线上舆论弹窗 - 木质风格 -->
 <!-- ============================================ -->
 <style>
-.online-forum-container {
+/* Logo 弹窗样式 - 木质风格 */
+.logo-container {
     position: fixed;
     top: 20px;
     left: 20px;
     width: 252px;
-    max-width: 90vw;
-    height: 550px;
-    max-height: 80vh;
+    height: 150px; /* 固定高度 */
     background: #D4A574;
     border: 8px solid #8B6F47;
     border-radius: 12px;
-    box-shadow: 
-        0 0 0 4px #A0826D,
-        0 8px 32px rgba(0, 0, 0, 0.5),
-        inset 0 2px 4px rgba(255, 255, 255, 0.2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 1001;
+    font-family: 'Microsoft YaHei', Arial, sans-serif;
+}
+
+.logo-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 15px;
+    background: #E8D5B7;
+    overflow: hidden;
+}
+
+.logo-image {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+}
+
+.online-forum-container {
+    position: fixed;
+    top: calc(20px + 150px + 10px); /* logo固定高度150px + 顶部间距20px + logo和聊天室间距10px */
+    left: 20px;
+    width: 252px;
+    max-width: 90vw;
+    height: calc(100vh - 120px - 150px - 10px - 50px - 10px); /* 总高度(100vh-120px) - logo高度 - logo和聊天室间距 - 按钮高度 - 聊天室和按钮间距 */
+    max-height: calc(100vh - 340px); /* 确保不会超出视口 */
+    background: #D4A574;
+    border: 8px solid #8B6F47;
+    border-radius: 12px;
+    box-shadow: none;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -856,8 +905,9 @@ function renderPersonaState(data) {
 }
 
 .forum-header h2 {
-    color: #3D2817;
+    color: #FFF8E7; /* 米白色 */
     font-size: 16px;
+    font-weight: bold; /* 粗体 */
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
     letter-spacing: 2px;
     margin: 0;
@@ -948,7 +998,7 @@ function renderPersonaState(data) {
     background: #F5E6D3;
     border-left: 4px solid #8B6F47;
     border-radius: 6px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: none;
     animation: forumFadeIn 0.3s ease-in;
 }
 
@@ -1001,25 +1051,208 @@ function renderPersonaState(data) {
     margin-bottom: 10px;
 }
 
-
-/* Agent列表折叠样式 */
-.persona-card {
-    transition: background-color 0.2s ease;
+/* 专家会议手动触发按钮 - 放在聊天室下方 */
+.expert-meeting-trigger-btn {
+    position: fixed;
+    bottom: 100px; /* 对齐地图弹窗底部：地图top(20px) + 地图height(calc(100vh-120px)) = calc(100vh-100px)，所以bottom=100px */
+    left: 20px;
+    width: 252px;
+    height: 50px; /* 固定按钮高度 */
+    padding: 12px 15px;
+    box-sizing: border-box; /* 确保padding包含在高度内 */
+    background: #D4A574;
+    border: 3px solid #8B6F47;
+    border-radius: 8px;
+    color: #3D2817;
+    font-size: 14px;
+    font-weight: bold;
+    font-family: 'Microsoft YaHei', Arial, sans-serif;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: none;
+    z-index: 1001;
 }
 
-.persona-card:hover {
-    background-color: #DDDDDD !important;
+.expert-meeting-trigger-btn:hover {
+    background: #C9976B;
+    border-color: #6B4E3D;
+    box-shadow: none;
+    transform: translateY(-1px);
 }
 
-.persona-toggle-icon {
-    transition: transform 0.3s ease;
-    display: inline-block;
+.expert-meeting-trigger-btn:active {
+    transform: translateY(0);
+    box-shadow: none;
 }
 
-.persona-card.expanded .persona-toggle-icon {
-    transform: rotate(180deg);
+/* Agent 状态栏样式 - 木质风格，固定在底部 */
+.agent-status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #D4A574;
+    border-top: 8px solid #8B6F47;
+    box-shadow: none;
+    z-index: 3000; /* 确保状态栏在所有窗口之上 */
+    font-family: 'Microsoft YaHei', Arial, sans-serif;
+}
+
+
+.status-bar-content {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    gap: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    position: relative;
+    z-index: 2;
+}
+
+.status-bar-content::-webkit-scrollbar {
+    height: 6px;
+}
+
+.status-bar-content::-webkit-scrollbar-track {
+    background: #A0826D;
+    border-radius: 3px;
+}
+
+.status-bar-content::-webkit-scrollbar-thumb {
+    background: #8B6F47;
+    border-radius: 3px;
+}
+
+.status-bar-content::-webkit-scrollbar-thumb:hover {
+    background: #6B4E3D;
+}
+
+.agent-status-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 14px;
+    background: #E8D5B7;
+    border: 2px solid #8B6F47;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    user-select: none;
+    box-shadow: none;
+}
+
+.agent-status-item:hover {
+    background: #F5E6D3;
+    border-color: #A0826D;
+    box-shadow: none;
+    transform: translateY(-1px);
+}
+
+.agent-status-item.active {
+    background: #C9976B;
+    border-color: #6B4E3D;
+    box-shadow: none;
+}
+
+.agent-status-name {
+    color: #3D2817;
+    font-size: 14px;
+    font-weight: 600;
+    text-shadow: 0 1px 1px rgba(255, 255, 255, 0.3);
+}
+
+.agent-status-item.active .agent-status-name {
+    color: #3D2817;
+    font-weight: 700;
+}
+
+/* 详细信息面板（从底部弹出）- 木质风格 */
+.persona-details-panel {
+    position: fixed;
+    bottom: 50px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100%); /* 初始位置在屏幕下方，居中显示 */
+    width: 90%; /* 宽度为90% */
+    max-width: 90vw; /* 在小屏幕上自适应 */
+    background: #D4A574;
+    border: 8px solid #8B6F47;
+    border-radius: 12px 12px 0 0;
+    border-bottom: 2px solid #6B4E3D;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 2999; /* 在状态栏(3000)下面，但在其他窗口上面 */
+    box-shadow: none;
+    opacity: 0;
+    transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+.persona-details-panel.show {
+    transform: translateX(-50%) translateY(0); /* 显示时回到正常位置 */
+    opacity: 1;
+}
+
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.details-panel-content {
+    padding: 15px 20px;
+    color: #3D2817;
+    font-size: 13px;
+    line-height: 1.6;
+    background: #E8D5B7;
+    position: relative;
+    z-index: 2;
+}
+
+.details-panel-content p {
+    margin: 10px 0;
+    padding: 8px;
+    background: #F5E6D3;
+    border-radius: 4px;
+    border-left: 3px solid #8B6F47;
+}
+
+.details-panel-content strong {
+    color: #6B4E3D;
+    margin-right: 8px;
+    font-weight: 600;
+}
+
+.details-panel-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.details-panel-content::-webkit-scrollbar-track {
+    background: #A0826D;
+    border-radius: 4px;
+}
+
+.details-panel-content::-webkit-scrollbar-thumb {
+    background: #8B6F47;
+    border-radius: 4px;
+}
+
+.details-panel-content::-webkit-scrollbar-thumb:hover {
+    background: #6B4E3D;
 }
 </style>
+
+<!-- Logo 弹窗 - 放在聊天室正上方 -->
+<div class="logo-container">
+    <div class="logo-content">
+        <img src="{% static 'img/logo.svg' %}" alt="News Town Logo" class="logo-image" onerror="console.error('Logo not found'); this.style.display='none';">
+    </div>
+</div>
 
 <div class="online-forum-container">
     <div class="forum-header">
@@ -1051,6 +1284,11 @@ function renderPersonaState(data) {
         </div>
     </div>
 </div>
+
+<!-- 专家会议手动触发按钮 - 放在聊天室下方 -->
+<button id="expert-meeting-trigger-btn" class="expert-meeting-trigger-btn" title="打开专家会议">
+    🎯 专家会议
+</button>
 
 <script>
 // 线上舆论弹窗逻辑
@@ -1126,22 +1364,124 @@ function renderPersonaState(data) {
     window.refreshForumPosts = loadForumPosts;
 })();
 
-// Agent列表折叠功能
+// Agent状态栏折叠功能
 function togglePersonaDetails(personaNameOs) {
     const details = document.getElementById('details-' + personaNameOs);
-    const icon = document.getElementById('toggle-icon-' + personaNameOs);
-    const card = details.closest('.persona-card');
+    const statusItem = document.querySelector(`#name__${personaNameOs}`)?.closest('.agent-status-item');
     
-    if (details.style.display === 'none') {
+    if (!details) {
+        return;
+    }
+    
+    // 检查当前面板是否已显示
+    const isCurrentlyShown = details.classList.contains('show');
+    
+    // 关闭所有面板
+    document.querySelectorAll('.persona-details-panel').forEach(panel => {
+        panel.classList.remove('show');
+        setTimeout(function() {
+            if (!panel.classList.contains('show')) {
+                panel.style.display = 'none';
+            }
+        }, 300);
+    });
+    
+    // 移除所有活动状态
+    document.querySelectorAll('.agent-status-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    // 如果当前面板未显示，则显示它
+    if (!isCurrentlyShown) {
         details.style.display = 'block';
-        icon.textContent = '▲';
-        card.classList.add('expanded');
-    } else {
-        details.style.display = 'none';
-        icon.textContent = '▼';
-        card.classList.remove('expanded');
+        // 使用 setTimeout 确保元素先渲染，再触发动画
+        setTimeout(function() {
+            details.classList.add('show');
+        }, 10);
+        if (statusItem) {
+            statusItem.classList.add('active');
+        }
     }
 }
+
+// 点击详情面板外部区域关闭面板
+(function() {
+    document.addEventListener('click', function(e) {
+        // 检查点击是否在详情面板内部
+        const clickedPanel = e.target.closest('.persona-details-panel');
+        const clickedStatusItem = e.target.closest('.agent-status-item');
+        
+        // 如果点击的不是详情面板和状态栏项，则关闭所有面板
+        if (!clickedPanel && !clickedStatusItem) {
+            document.querySelectorAll('.persona-details-panel').forEach(panel => {
+                panel.classList.remove('show');
+                // 等待动画完成后再隐藏
+                setTimeout(function() {
+                    panel.style.display = 'none';
+                }, 300);
+            });
+            document.querySelectorAll('.agent-status-item').forEach(item => {
+                item.classList.remove('active');
+            });
+        }
+    });
+})();
+
+// 状态栏鼠标滚轮滚动功能 - 优化为更顺滑的滚动
+(function() {
+    const statusBar = document.querySelector('.agent-status-bar');
+    const statusBarContent = document.querySelector('.status-bar-content');
+    
+    if (statusBar && statusBarContent) {
+        // 使用平滑滚动
+        statusBarContent.style.scrollBehavior = 'smooth';
+        
+        statusBar.addEventListener('wheel', function(e) {
+            // 阻止默认的垂直滚动
+            e.preventDefault();
+            
+            // 增加滚动速度，使滚动更顺滑
+            const scrollAmount = e.deltaY * 1.5; // 增加滚动速度
+            
+            // 平滑滚动
+            statusBarContent.scrollBy({
+                left: scrollAmount,
+                behavior: 'smooth'
+            });
+        }, { passive: false });
+    }
+})();
+
+// 专家会议手动触发按钮
+(function() {
+    const triggerBtn = document.getElementById('expert-meeting-trigger-btn');
+    const expertOverlay = document.getElementById('expert-meeting-overlay');
+    const expertCloseBtn = document.getElementById('expert-close-btn');
+    
+    if (triggerBtn && expertOverlay) {
+        // 点击按钮显示专家会议弹窗
+        triggerBtn.addEventListener('click', function() {
+            expertOverlay.style.display = 'flex';
+        });
+    }
+    
+    // 关闭按钮功能（如果还没有的话）
+    if (expertCloseBtn && expertOverlay) {
+        expertCloseBtn.addEventListener('click', function() {
+            expertOverlay.style.display = 'none';
+        });
+    }
+    
+    // 点击遮罩层关闭弹窗
+    if (expertOverlay) {
+        expertOverlay.addEventListener('click', function(e) {
+            if (e.target === expertOverlay) {
+                expertOverlay.style.display = 'none';
+            }
+        });
+    }
+})();
+
 </script>
 
 {% endblock js_content %}

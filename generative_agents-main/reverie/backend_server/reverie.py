@@ -614,7 +614,7 @@ class ReverieServer:
 
           # 在每天 23:00 触发一次：从平民聊天中汇总舆论，并写入专家长期记忆。
           try:
-            if self.curr_time.hour == 23:
+            if self.curr_time.hour == 23 and self.curr_time.minute == 0:
               curr_date = self.curr_time.date()
               if self.last_public_opinion_date != curr_date:
                 generate_and_broadcast_public_opinion(

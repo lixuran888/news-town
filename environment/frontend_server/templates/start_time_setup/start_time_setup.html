@@ -2,95 +2,186 @@
 {% load staticfiles %}
 
 {% block content %}
-<div class="container" style="max-width: 900px; padding-top: 3em; padding-bottom: 4em;">
-  <div class="row">
-    <!-- 左侧：Logo + 当前配置 -->
-    <div class="col-md-4 text-center">
-      <img src="{% static 'img/atlas.png' %}" style="width: 120px; margin-bottom: 1em;">
-      <h3 style="font-weight: 700; margin-bottom: 0.5em;">News Town Simulation</h3>
-      <p style="color: #777;">请先设置世界的开始时间，然后启动仿真。</p>
+<style>
+.time-setup-wrapper {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 60px;
+    min-height: calc(100vh - 100px);
+    padding: 40px 20px;
+    font-family: 'Microsoft YaHei', Arial, sans-serif;
+}
 
-      {% if current_start_date %}
-      <div style="margin-top: 1.5em; font-size: 0.95em; color: #555; text-align:left;">
-        <strong>当前配置：</strong><br>
-        开始日期：{{ current_start_date }}<br>
-        当前世界时间：{{ current_curr_time }}
-      </div>
-      {% endif %}
+.time-setup-logo {
+    max-width: 500px;
+    width: 100%;
+    flex-shrink: 0;
+}
+
+.time-setup-logo img {
+    width: 100%;
+    height: auto;
+}
+
+.time-setup-panel {
+    background: #D4A574;
+    border: 8px solid #8B6F47;
+    border-radius: 12px;
+    padding: 30px;
+    max-width: 500px;
+    width: 100%;
+    flex-shrink: 0;
+}
+
+.time-setup-header {
+    background: linear-gradient(180deg, #A0826D 0%, #8B6F47 100%);
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin: -30px -30px 25px -30px;
+    border-bottom: 3px solid #6B4E3D;
+    text-align: center;
+}
+
+.time-setup-header h4 {
+    color: #FFF8E7;
+    font-weight: bold;
+    margin: 0;
+    font-size: 18px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    color: #3D2817;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.form-control {
+    width: 100%;
+    background: #F5E6D3;
+    border: 2px solid #8B6F47;
+    border-radius: 4px;
+    color: #3D2817;
+    padding: 8px 12px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.form-control:focus {
+    background: #FFF8E7;
+    border-color: #6B4E3D;
+    box-shadow: none;
+    outline: none;
+}
+
+.help-block {
+    color: #6B4E3D;
+    font-size: 0.9em;
+    margin-top: 5px;
+}
+
+.btn-primary {
+    width: 100%;
+    background: #8B6F47;
+    border: 2px solid #6B4E3D;
+    color: #FFF8E7;
+    font-weight: bold;
+    padding: 12px 20px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.btn-primary:hover {
+    background: #6B4E3D;
+    border-color: #3D2817;
+    color: #FFF8E7;
+}
+
+.alert {
+    border-radius: 6px;
+    padding: 12px 15px;
+    margin-bottom: 15px;
+}
+
+.alert-danger {
+    background: #F5E6D3;
+    border-left: 4px solid #f87171;
+    color: #3D2817;
+}
+
+.alert-success {
+    background: #F5E6D3;
+    border-left: 4px solid #4ade80;
+    color: #3D2817;
+}
+</style>
+
+<div class="time-setup-wrapper">
+  <!-- Logo -->
+  <div class="time-setup-logo">
+    <img src="{% static 'img/logo.svg' %}" alt="News Town Logo" onerror="console.error('Logo not found'); this.style.display='none';">
+  </div>
+
+  <!-- 时间设置浮窗 -->
+  <div class="time-setup-panel">
+    <div class="time-setup-header">
+      <h4>设置世界开始时间</h4>
     </div>
 
-    <!-- 右侧：时间设置表单 -->
-    <div class="col-md-8">
-      <div class="panel panel-default" style="box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
-        <div class="panel-heading" style="background:#f8f9fa;">
-          <h4 class="panel-title" style="font-weight:600;">设置世界开始时间</h4>
-        </div>
-        <div class="panel-body">
-
-          {% if error %}
-          <div class="alert alert-danger" role="alert" style="margin-bottom: 1em;">
-            {{ error }}
-          </div>
-          {% endif %}
-
-          {% if message %}
-          <div class="alert alert-success" role="alert" style="margin-bottom: 1em;">
-            {{ message }}
-          </div>
-          {% endif %}
-
-          <form method="post" class="form-horizontal">
-            {% csrf_token %}
-
-            <div class="form-group">
-              <label class="col-sm-3 control-label">开始日期</label>
-              <div class="col-sm-9">
-                <input
-                  type="date"
-                  name="start_date"
-                  class="form-control"
-                  value="{{ initial_date_iso }}"
-                  required
-                >
-                <p class="help-block">选择模拟世界的开始日期，例如：2023-02-13。</p>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label class="col-sm-3 control-label">开始时间</label>
-              <div class="col-sm-9">
-                <input
-                  type="time"
-                  name="start_time"
-                  class="form-control"
-                  value="{{ initial_time_iso|default:'00:00' }}"
-                  step="60"
-                >
-                <p class="help-block">可选项，默认为 00:00。精确到分钟即可。</p>
-              </div>
-            </div>
-
-            <div class="form-group" style="margin-top: 1.5em;">
-              <div class="col-sm-offset-3 col-sm-9">
-                <button type="submit" class="btn btn-primary">
-                  <span class="glyphicon glyphicon-time"></span>
-                  &nbsp;保存开始时间
-                </button>
-              </div>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <div class="alert alert-info" style="margin-top: 1.5em;">
-        <strong>提示：</strong>
-        <ul style="margin-bottom: 0;">
-          <li>设置完成后，会自动跳转到仿真界面</li>
-          <li>请在终端按 Enter 启动后端</li>
-        </ul>
-      </div>
+    {% if error %}
+    <div class="alert alert-danger" role="alert">
+      {{ error }}
     </div>
+    {% endif %}
+
+    {% if message %}
+    <div class="alert alert-success" role="alert">
+      {{ message }}
+    </div>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+
+      <div class="form-group">
+        <label>开始日期</label>
+        <input
+          type="date"
+          name="start_date"
+          class="form-control"
+          value="{{ initial_date_iso }}"
+          required
+        >
+        <p class="help-block">选择模拟世界的开始日期，例如：2023-02-13。</p>
+      </div>
+
+      <div class="form-group">
+        <label>开始时间</label>
+        <input
+          type="time"
+          name="start_time"
+          class="form-control"
+          value="{{ initial_time_iso|default:'00:00' }}"
+          step="60"
+        >
+        <p class="help-block">可选项，默认为 00:00。精确到分钟即可。</p>
+      </div>
+
+      <div class="form-group" style="margin-top: 1.5em;">
+        <button type="submit" class="btn btn-primary">
+          <span class="glyphicon glyphicon-time"></span>
+          &nbsp;保存开始时间
+        </button>
+      </div>
+    </form>
   </div>
 </div>
 {% endblock content %}
-
