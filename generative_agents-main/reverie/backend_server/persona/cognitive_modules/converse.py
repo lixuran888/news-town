@@ -290,7 +290,15 @@ def generate_poig_score(persona, event_type, description):
 
 def load_history_via_whisper(personas, whispers):
   for count, row in enumerate(whispers): 
-    persona = personas[row[0]]
+    persona_name_raw = row[0]
+    # 先将中文名转换为拼音（兼容记忆中的中文名）
+    from persona.cognitive_modules.plan import normalize_persona_name
+    persona_name = normalize_persona_name(persona_name_raw)
+    # 安全检查：确保persona存在
+    if persona_name not in personas:
+      print(f"[converse] WARNING: Persona '{persona_name_raw}' (normalized: '{persona_name}') not found in personas dict, skipping whisper")
+      continue
+    persona = personas[persona_name]
     whisper = row[1]
 
     thought = generate_inner_thought(persona, whisper)

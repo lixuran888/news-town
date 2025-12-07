@@ -51,6 +51,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'corsheaders.middleware.CorsMiddleware',
+    'translator.middleware.ThrottledRequestLoggingMiddleware',  # 节流请求日志
 ]
 
 ROOT_URLCONF = 'frontend_server.urls'
@@ -117,6 +118,23 @@ USE_L10N = True
 
 USE_TZ = True
 
+# 日志配置：禁用Django默认的请求日志，改用自定义中间件控制
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'django.server': {
+            'handlers': ['console'],
+            'level': 'WARNING',  # 只显示WARNING及以上级别，屏蔽INFO级别的请求日志
+            'propagate': False,
+        },
+    },
+}
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.2/howto/static-files/

@@ -396,21 +396,21 @@ def format_posts_for_display(posts):
 
 PHONE_USAGE_CONFIG = {
     # 重度用户：3-4次/天
-    "高建国": {"min_times": 3, "max_times": 4, "preferred_hours": [9, 14, 19, 23]},
-    "韩小雪": {"min_times": 2, "max_times": 3, "preferred_hours": [7, 16, 21]},
+    "Gao Jianguo": {"min_times": 3, "max_times": 4, "preferred_hours": [9, 14, 19, 23]},
+    "Han Xiaoxue": {"min_times": 2, "max_times": 3, "preferred_hours": [7, 16, 21]},
     
     # 中度用户：1-2次/天
-    "陈思远": {"min_times": 1, "max_times": 2, "preferred_hours": [10, 22]},
-    "王丽华": {"min_times": 1, "max_times": 2, "preferred_hours": [12, 20]},
-    "周小艺": {"min_times": 1, "max_times": 2, "preferred_hours": [15, 21]},
-    "张国庆": {"min_times": 1, "max_times": 1, "preferred_hours": [20]},
+    "Chen Siyuan": {"min_times": 1, "max_times": 2, "preferred_hours": [10, 22]},
+    "Wang Lihua": {"min_times": 1, "max_times": 2, "preferred_hours": [12, 20]},
+    "Zhou Xiaoyi": {"min_times": 1, "max_times": 2, "preferred_hours": [15, 21]},
+    "Zhang Guoqing": {"min_times": 1, "max_times": 1, "preferred_hours": [20]},
     
     # 轻度用户：0-1次/天
-    "林小雨": {"min_times": 0, "max_times": 1, "preferred_hours": [21]},
-    "李大强": {"min_times": 0, "max_times": 1, "preferred_hours": [22]},
+    "Lin Xiaoyu": {"min_times": 0, "max_times": 1, "preferred_hours": [21]},
+    "Li Daqiang": {"min_times": 0, "max_times": 1, "preferred_hours": [22]},
     
     # 几乎不用
-    "刘小敏": {"min_times": 0, "max_times": 0, "preferred_hours": []},
+    "Liu Xiaomin": {"min_times": 0, "max_times": 0, "preferred_hours": []},
 }
 
 def should_browse_phone(persona, current_hour):

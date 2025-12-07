@@ -8,6 +8,7 @@ import random
 import json
 from os import listdir
 import os
+import time
 
 import datetime
 import sys
@@ -265,10 +266,22 @@ def home(request):
       if key in persona_names_set: 
         persona_init_pos += [[key, val["x"], val["y"]]]
 
+  # 读取初始时间
+  initial_time_str = None
+  try:
+    meta_path = f"storage/{sim_code}/reverie/meta.json"
+    if os.path.exists(meta_path):
+      with open(meta_path, 'r', encoding='utf-8') as f:
+        meta = json.load(f)
+      initial_time_str = meta.get("curr_time", None)
+  except Exception as e:
+    print(f"[home] Error reading meta.json for initial time: {e}")
+
   context = {"sim_code": sim_code,
              "step": step, 
              "persona_names": persona_names,
              "persona_init_pos": persona_init_pos,
+             "initial_time": initial_time_str,
              "mode": "simulate"}
   template = "home/home.html"
   return render(request, template, context)
@@ -473,6 +486,9 @@ def process_environment(request):
   return HttpResponse("received")
 
 
+# 用于节流日志输出的全局变量
+_last_update_log_time = 0
+
 def update_environment(request): 
   """
   <BACKEND to FRONTEND> 
@@ -486,6 +502,8 @@ def update_environment(request):
   RETURNS: 
     HttpResponse
   """
+  global _last_update_log_time
+  
   # f_curr_sim_code = "temp_storage/curr_sim_code.json"
   # with open(f_curr_sim_code) as json_file:  
   #   sim_code = json.load(json_file)["sim_code"]
@@ -493,6 +511,13 @@ def update_environment(request):
   data = json.loads(request.body)
   step = data["step"]
   sim_code = data["sim_code"]
+
+  # 节流日志输出：每秒只打印一次
+  current_time = time.time()
+  if current_time - _last_update_log_time >= 1.0:
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{timestamp}] [update_environment] Step {step}, sim_code: {sim_code}")
+    _last_update_log_time = current_time
 
   response_data = {"<step>": -1}
   if (check_if_file_exists(f"storage/{sim_code}/movement/{step}.json")):

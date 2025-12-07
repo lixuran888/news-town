@@ -45,8 +45,15 @@ def execute(persona, maze, personas, plan):
 
     if "<persona>" in plan: 
       # Executing persona-persona interaction.
-      target_p_tile = (personas[plan.split("<persona>")[-1].strip()]
-                       .scratch.curr_tile)
+      target_persona_name_raw = plan.split("<persona>")[-1].strip()
+      # 先将中文名转换为拼音（兼容记忆中的中文名）
+      from persona.cognitive_modules.plan import normalize_persona_name
+      target_persona_name = normalize_persona_name(target_persona_name_raw)
+      # 安全检查：确保目标persona存在
+      if target_persona_name not in personas:
+        print(f"[execute] WARNING: Target persona '{target_persona_name_raw}' (normalized: '{target_persona_name}') not found in personas dict, skipping interaction")
+        return persona.scratch.curr_tile, "...", f"idle (target {target_persona_name} not found)"
+      target_p_tile = personas[target_persona_name].scratch.curr_tile
       potential_path = path_finder(maze.collision_maze, 
                                    persona.scratch.curr_tile, 
                                    target_p_tile, 

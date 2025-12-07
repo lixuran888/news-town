@@ -509,6 +509,7 @@ class ReverieServer:
       # new environment file that matches our step count. That's when we run 
       # the content of this for loop. Otherwise, we just wait. 
       curr_env_file = f"{sim_folder}/environment/{self.step}.json"
+      env_retrieved = False  # 每次循环开始时重置
       if check_if_file_exists(curr_env_file):
         if debug:
           print(f"[DEBUG] Found environment file for step {self.step}: {curr_env_file}")
@@ -519,10 +520,12 @@ class ReverieServer:
           with open(curr_env_file) as json_file:
             new_env = json.load(json_file)
             env_retrieved = True
-        except: 
+        except Exception as e:
+          if debug:
+            print(f"[DEBUG] Failed to read environment file: {e}")
           pass
       
-        if env_retrieved: 
+      if env_retrieved: 
           # This is where we go through <game_obj_cleanup> to clean up all 
           # object actions that were used in this cylce. 
           for key, val in game_obj_cleanup.items(): 

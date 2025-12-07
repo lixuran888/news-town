@@ -19,6 +19,23 @@ from persona.cognitive_modules.phone_browsing import (
     browse_phone, should_browse_phone, PHONE_USAGE_CONFIG
 )
 
+# 中文名到拼音的映射（用于兼容记忆中的中文名）
+NAME_MAPPING = {
+    "高建国": "Gao Jianguo",
+    "王丽华": "Wang Lihua",
+    "林小雨": "Lin Xiaoyu",
+    "李大强": "Li Daqiang",
+    "陈思远": "Chen Siyuan",
+    "周小艺": "Zhou Xiaoyi",
+    "韩小雪": "Han Xiaoxue",
+    "张国庆": "Zhang Guoqing",
+    "刘小敏": "Liu Xiaomin",
+}
+
+def normalize_persona_name(name):
+    """将中文名转换为拼音，如果已经是拼音则直接返回"""
+    return NAME_MAPPING.get(name, name)
+
 ##############################################################################
 # CHAPTER 2: Generate
 ##############################################################################
@@ -45,7 +62,7 @@ def generate_wake_up_hour(persona):
   # they do not sleep too late into the morning. This keeps the world more
   # active and creates a longer window for encounters and conversations.
   name = getattr(persona.scratch, "name", persona.name)
-  early_risers = {"王丽华", "林小雨", "高建国", "李大强", "陈思远", "周小艺", "韩小雪", "张国庆", "刘小敏"}
+  early_risers = {"Wang Lihua", "Lin Xiaoyu", "Gao Jianguo", "Li Daqiang", "Chen Siyuan", "Zhou Xiaoyi", "Han Xiaoxue", "Zhang Guoqing", "Liu Xiaomin"}
   if name in early_risers:
     # Ensure they wake up no later than 7am, but never before 5am to avoid
     # unrealistic schedules if the model outputs extreme values.
@@ -261,7 +278,7 @@ def generate_action_sector(act_desp, persona, maze):
   # 对于三位学生人物，当日程文本本身已经明显指向某类地点时，
   # 在这里做一层本地规则，尽量减少 GPT 对地点判断的影响。
   name = getattr(persona.scratch, "name", persona.name)
-  civilian_set = {"王丽华", "林小雨", "高建国", "李大强", "陈思远", "周小艺", "韩小雪", "张国庆", "刘小敏"}
+  civilian_set = {"Wang Lihua", "Lin Xiaoyu", "Gao Jianguo", "Li Daqiang", "Chen Siyuan", "Zhou Xiaoyi", "Han Xiaoxue", "Zhang Guoqing", "Liu Xiaomin"}
   if name in civilian_set:
     # 睡觉 / 上床 → 学生宿舍
     if ("sleep" in text) or ("in bed" in text):
@@ -325,15 +342,15 @@ def generate_action_arena(act_desp, persona, maze, act_world, act_sector):
   name = getattr(persona.scratch, "name", persona.name)
   # 平民角色睡觉时返回各自房间
   civilian_rooms = {
-    "王丽华": "王丽华的公寓",
-    "高建国": "高建国的房间",
-    "林小雨": "林小雨的房间",
-    "李大强": "李大强家",
-    "陈思远": "陈思远的房间",
-    "周小艺": "周小艺的房间",
-    "韩小雪": "韩小雪家",
-    "张国庆": "张国庆的房间",
-    "刘小敏": "刘小敏的房间",
+    "Wang Lihua": "Wang Lihua's apartment",
+    "Gao Jianguo": "Gao Jianguo's room",
+    "Lin Xiaoyu": "Lin Xiaoyu's room",
+    "Li Daqiang": "Li Daqiang's home",
+    "Chen Siyuan": "Chen Siyuan's room",
+    "Zhou Xiaoyi": "Zhou Xiaoyi's room",
+    "Han Xiaoxue": "Han Xiaoxue's home",
+    "Zhang Guoqing": "Zhang Guoqing's room",
+    "Liu Xiaomin": "Liu Xiaomin's room",
   }
   if ("sleep" in text) or ("in bed" in text):
     if name in civilian_rooms:
@@ -676,7 +693,7 @@ def _seed_public_health_expert_food_poisoning_memory(persona):
 
 def _seed_civilians_food_poisoning_news_memory(persona):
   name = getattr(persona.scratch, "name", persona.name)
-  civilian_names = {"王丽华", "高建国", "林小雨", "李大强", "陈思远", "周小艺", "韩小雪", "张国庆", "刘小敏"}
+  civilian_names = {"Wang Lihua", "Gao Jianguo", "Lin Xiaoyu", "Li Daqiang", "Chen Siyuan", "Zhou Xiaoyi", "Han Xiaoxue", "Zhang Guoqing", "Liu Xiaomin"}
   if name not in civilian_names:
     return
   if getattr(persona.scratch, "_seeded_food_poisoning_news", False):
@@ -708,55 +725,55 @@ def _seed_civilians_food_poisoning_news_memory(persona):
       None,
     )
 
-  if name == "王丽华":
+  if name == "Wang Lihua":
     _add_thought(
       "阳光幼儿园的食物中毒事件让我非常震惊！孩子才这么小，怎么能出这种事？我在咖啡馆听到好多家长和老师在讨论这件事，大家都很担心。",
       extra_keywords={"cafe", "gossip", "parents"},
       poignancy=7,
     )
-  elif name == "高建国":
+  elif name == "Gao Jianguo":
     _add_thought(
       "幼儿园食物中毒事件又一次证明了这系统烂透了，谁在乎孩子？他们只在乎赚钱。那些监管部门都是摆设！",
       extra_keywords={"system", "anger", "criticism"},
       poignancy=8,
     )
-  elif name == "林小雨":
+  elif name == "Lin Xiaoyu":
     _add_thought(
       "作为阳光幼儿园的老师，食物中毒事件让我心痛不已。那些孩子我每天都在照顾，看到他们生病我真的很难受。最重要的是孩子先安全、先好起来。",
       extra_keywords={"teacher", "care", "children"},
       poignancy=9,
     )
-  elif name == "李大强":
+  elif name == "Li Daqiang":
     _add_thought(
       "我孩子在医院躺着，你们跟我讲程序？讲流程？我不管什么流程，我要结果！这次绝对不能就这么算了！",
       extra_keywords={"parent", "anger", "hospital"},
       poignancy=10,
     )
-  elif name == "陈思远":
+  elif name == "Chen Siyuan":
     _add_thought(
       "幼儿园食物中毒事件不仅是一场意外，它折射的是我们到底把儿童安全放在什么位置。我想在播客里深入讨论这个问题。",
       extra_keywords={"podcast", "analysis", "institution"},
       poignancy=7,
     )
-  elif name == "周小艺":
+  elif name == "Zhou Xiaoyi":
     _add_thought(
       "大家都在怕，可是谁都不知道下一步该怎么办。我画了一幅空荡荡的幼儿园滑梯，试图表达这种无力感。",
       extra_keywords={"art", "observation", "emotion"},
       poignancy=6,
     )
-  elif name == "韩小雪":
+  elif name == "Han Xiaoxue":
     _add_thought(
       "那个食堂……我以前也在那吃饭的。听说有小朋友中毒了，那些小孩比我小时候还小，他们什么都不懂。",
       extra_keywords={"former_student", "memory", "concern"},
       poignancy=7,
     )
-  elif name == "张国庆":
+  elif name == "Zhang Guoqing":
     _add_thought(
       "我这几天拉的家长，一个比一个憔悴。每个人都在讲自己的孩子，我听着都揪心。",
       extra_keywords={"taxi", "stories", "sympathy"},
       poignancy=6,
     )
-  elif name == "刘小敏":
+  elif name == "Liu Xiaomin":
     _add_thought(
       "我看见了……那天……那个供应商送来的菜，颜色就不太对。我当时想说，但厨师长说没事。如果我当时坚持说出来，是不是就不会这样……",
       extra_keywords={"witness", "guilt", "secret"},
@@ -865,7 +882,7 @@ def _long_term_planning(persona, new_day):
     return compressed or schedule
 
   name = getattr(persona.scratch, "name", persona.name)
-  civilian_personas = {"王丽华", "林小雨", "高建国", "李大强", "陈思远", "周小艺", "韩小雪", "张国庆", "刘小敏"}
+  civilian_personas = {"Wang Lihua", "Lin Xiaoyu", "Gao Jianguo", "Li Daqiang", "Chen Siyuan", "Zhou Xiaoyi", "Han Xiaoxue", "Zhang Guoqing", "Liu Xiaomin"}
   if name in civilian_personas:
     sched = persona.scratch.f_daily_schedule
     # Breakfast: 8:00–9:00 (480–540 minutes)
@@ -1064,11 +1081,25 @@ def _determine_action(persona, maze):
     new_address = f"{act_world}:{act_sector}:{act_arena}:{act_game_object}"
     act_pron = generate_action_pronunciatio(act_desp, persona)
     act_event = generate_action_event_triple(act_desp, persona)
+    # 规范化事件三元组中的subject（如果是persona名称，将中文名转换为拼音）
+    if act_event and len(act_event) >= 3:
+      s, p, o = act_event[0], act_event[1], act_event[2]
+      # 如果subject是persona名称，规范化它
+      if ":" not in s and s in NAME_MAPPING:
+        s = normalize_persona_name(s)
+        act_event = (s, p, o)
     # Persona's actions also influence the object states. We set those up here. 
     act_obj_desp = generate_act_obj_desc(act_game_object, act_desp, persona)
     act_obj_pron = generate_action_pronunciatio(act_obj_desp, persona)
     act_obj_event = generate_act_obj_event_triple(act_game_object, 
                                                   act_obj_desp, persona)
+    # 规范化对象事件三元组中的subject（如果是persona名称，将中文名转换为拼音）
+    if act_obj_event and len(act_obj_event) >= 3:
+      s, p, o = act_obj_event[0], act_obj_event[1], act_obj_event[2]
+      # 如果subject是persona名称，规范化它
+      if ":" not in s and s in NAME_MAPPING:
+        s = normalize_persona_name(s)
+        act_obj_event = (s, p, o)
 
   # Adding the action to persona's queue. 
   persona.scratch.add_new_action(new_address, 
@@ -1104,17 +1135,22 @@ def _choose_retrieved(persona, retrieved):
   
   # We do not want to take self events... for now 
   copy_retrieved = retrieved.copy()
+  persona_name_normalized = normalize_persona_name(persona.name)
   for event_desc, rel_ctx in copy_retrieved.items(): 
     curr_event = rel_ctx["curr_event"]
-    if curr_event.subject == persona.name: 
+    # 规范化subject后比较（兼容记忆中的中文名）
+    curr_subject_normalized = normalize_persona_name(curr_event.subject)
+    if curr_subject_normalized == persona_name_normalized: 
       del retrieved[event_desc]
 
   # Always choose persona first.
   priority = []
   for event_desc, rel_ctx in retrieved.items(): 
     curr_event = rel_ctx["curr_event"]
+    # 规范化subject后比较（兼容记忆中的中文名）
+    curr_subject_normalized = normalize_persona_name(curr_event.subject)
     if (":" not in curr_event.subject 
-        and curr_event.subject != persona.name): 
+        and curr_subject_normalized != persona_name_normalized): 
       priority += [rel_ctx]
   if priority: 
     return random.choice(priority)
@@ -1312,17 +1348,24 @@ def _should_react(persona, retrieved, personas):
 
   if ":" not in curr_event.subject: 
     # this is a persona event. 
-    talk_result = lets_talk(persona, personas[curr_event.subject], retrieved)
+    # 安全检查：确保目标persona存在
+    # 先将中文名转换为拼音（兼容记忆中的中文名）
+    target_persona_name = normalize_persona_name(curr_event.subject)
+    if target_persona_name not in personas:
+      print(f"[plan] WARNING: Persona '{curr_event.subject}' (normalized: '{target_persona_name}') not found in personas dict, skipping interaction")
+      return False
+    
+    talk_result = lets_talk(persona, personas[target_persona_name], retrieved)
     
     if talk_result == True:
-      return f"chat with {curr_event.subject}"
+      return f"chat with {target_persona_name}"
     elif talk_result == "approach":
-      return f"approach {curr_event.subject}"
+      return f"approach {target_persona_name}"
     elif talk_result == "wait_for_approach":
       # 对方正在走过来，我原地等待
       return False
     
-    react_mode = lets_react(persona, personas[curr_event.subject], 
+    react_mode = lets_react(persona, personas[target_persona_name], 
                             retrieved)
     return react_mode
   return False
@@ -1386,7 +1429,14 @@ def _chat_react(maze, persona, focused_event, reaction_mode, personas):
   # There are two personas -- the persona who is initiating the conversation
   # and the persona who is the target. We get the persona instances here. 
   init_persona = persona
-  target_persona = personas[reaction_mode[9:].strip()]
+  target_persona_name_raw = reaction_mode[9:].strip()
+  # 先将中文名转换为拼音（兼容记忆中的中文名）
+  target_persona_name = normalize_persona_name(target_persona_name_raw)
+  # 安全检查：确保目标persona存在
+  if target_persona_name not in personas:
+    print(f"[plan] WARNING: Target persona '{target_persona_name_raw}' (normalized: '{target_persona_name}') not found in personas dict, skipping chat reaction")
+    return
+  target_persona = personas[target_persona_name]
   curr_personas = [init_persona, target_persona]
 
   # 保存对话前的原计划信息（用于对话结束后判断是否恢复）

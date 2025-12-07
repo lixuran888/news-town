@@ -3,6 +3,7 @@
 <div id="step" style="display:none">{{step}}</div>
 <div id="sim_code" style="display:none">{{sim_code}}</div>
 <div id="persona_name_list" style="display:none">{{persona_name_str}}</div>
+<div id="initial_time" style="display:none">{% if initial_time %}{{initial_time}}{% endif %}</div>
 <div id="persona_init_pos" style="display:none">
 	{% for i in persona_init_pos %}
 		<span>{{i.0}},{{i.1}},{{i.2}}</span>
@@ -113,7 +114,8 @@
 	let timer = timer_max;
 
 	// <phase> -- there are three phases: "process," "update," and "execute."
-	let phase = "update"; // or "update" or "execute"
+	// 初始阶段：step=0时从"process"开始（发送初始环境数据），否则从"update"开始（等待后端响应）
+	let phase = (step == 0) ? "process" : "update"; // or "update" or "execute"
 
 	// Variables for storing movements that are sent from the backend server.
 	let execute_movement;
@@ -326,6 +328,41 @@
 	    frames: anims.generateFrameNames("atlas", { prefix: "misa-back-walk.", start: 0, end: 3, zeroPad: 3 }),
 	    frameRate: 4,
 	    repeat: -1 });
+	  
+	  // 显示初始时间（如果存在）
+	  const initialTimeEl = document.getElementById('initial_time');
+	  if (initialTimeEl && initialTimeEl.textContent.trim()) {
+	    const currTimeStr = initialTimeEl.textContent.trim();
+	    try {
+	      // 解析 "February 13, 2023, 17:00:00" 格式
+	      const timeMatch = currTimeStr.match(/(\w+) (\d+), (\d+), (\d{2}):(\d{2}):(\d{2})/);
+	      if (timeMatch) {
+	        const monthNames = ["January", "February", "March", "April", "May", "June",
+	                          "July", "August", "September", "October", "November", "December"];
+	        const monthName = timeMatch[1];
+	        const day = timeMatch[2].padStart(2, '0');
+	        const year = timeMatch[3];
+	        const hour = timeMatch[4];
+	        const minute = timeMatch[5];
+	        const second = timeMatch[6];
+	        
+	        const monthIndex = monthNames.indexOf(monthName);
+	        const month = (monthIndex + 1).toString().padStart(2, '0');
+	        
+	        const dateStr = `${year}-${month}-${day}`;
+	        const timeStr = `${hour}:${minute}:${second}`;
+	        
+	        const timeContentEl = document.getElementById("game-time-content");
+	        if (timeContentEl) {
+	          timeContentEl.innerHTML = 
+	            `<div class="game-time-date">${dateStr}</div>` +
+	            `<div class="game-time-clock">${timeStr}</div>`;
+	        }
+	      }
+	    } catch (e) {
+	      console.error("Error parsing initial time:", e);
+	    }
+	  }
 	}
 
 
@@ -493,15 +530,9 @@
 	        movement_target[curr_persona_name] = [curr_x * tile_width, 
 	                                              curr_y * tile_width]; 
 	        let pronunciatio_content = execute_movement["persona"][curr_persona_name]["pronunciatio"];
-	        // This is what gives the pronunciatio balloon the name initials. We 
-	        // use regex to extract the initials of the personas. 
-	        // E.g., "Dolores Murphy" -> "DM"
-	        let rgx = new RegExp(/(\p{L}{1})\p{L}+/, 'gu');
-	        let initials = [...curr_persona_name.matchAll(rgx)] || [];
-	        initials = (
-	          (initials.shift()?.[1] || '') + (initials.pop()?.[1] || '')
-	        ).toUpperCase();
-	        pronunciatios[curr_persona_name].setText(initials + ": " + pronunciatio_content);
+	        // 显示人物全名（之前是首字母缩写）
+	        // 例如："Wang Lihua" -> "Wang Lihua"（不再显示为"WL"）
+	        pronunciatios[curr_persona_name].setText(curr_persona_name + ": " + pronunciatio_content);
 	      }
 
 	      console.log(curr_persona_name);
@@ -563,7 +594,7 @@
 	          curr_persona.body.y = movement_target[curr_persona_name][1];
 	        }
 	        phase = "process";
-	        execute_count = execute_count_max + 1;
+	        execute_count = execute_count_max;  // 重置为最大值，准备下一轮
 	        step = step + 1;
 	      }
 	    }
