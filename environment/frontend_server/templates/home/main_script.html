@@ -42,6 +42,140 @@
 	}
 
 
+// 角色贴图映射：人物 -> 对应的角色贴图（assets/characters 下的文件名，不含扩展名）
+// 后端名字可能是中文 / 英文 / 下划线形式，这里做归一化匹配
+const personaTextureMap = {
+  "王丽华": "Carmen_Ortiz",
+  "wanglihua": "Carmen_Ortiz",
+  "wang_lihua": "Carmen_Ortiz",
+  "wang lihua": "Carmen_Ortiz",
+  "carmen ortiz": "Carmen_Ortiz",
+  "carmen_ortiz": "Carmen_Ortiz",
+
+  "高建国": "Sam_Moore",
+  "gaojianguo": "Sam_Moore",
+  "gao_jianguo": "Sam_Moore",
+  "gao jianguo": "Sam_Moore",
+  "sam moore": "Sam_Moore",
+  "sam_moore": "Sam_Moore",
+
+  "林小雨": "Isabella_Rodriguez",
+  "linxiaoyu": "Isabella_Rodriguez",
+  "lin_xiaoyu": "Isabella_Rodriguez",
+  "lin xiaoyu": "Isabella_Rodriguez",
+  "isabella rodriguez": "Isabella_Rodriguez",
+  "isabella_rodriguez": "Isabella_Rodriguez",
+
+  "李大强": "John_Lin",
+  "lidaqiang": "John_Lin",
+  "li_daqiang": "John_Lin",
+  "li daqiang": "John_Lin",
+  "john lin": "John_Lin",
+  "john_lin": "John_Lin",
+
+  "陈思远": "Arthur_Burton",
+  "chensiyuan": "Arthur_Burton",
+  "chen_siyuan": "Arthur_Burton",
+  "chen siyuan": "Arthur_Burton",
+  "arthur burton": "Arthur_Burton",
+  "arthur_burton": "Arthur_Burton",
+
+  "周小艺": "Yuriko_Yamamoto",
+  "zhouxiaoyi": "Yuriko_Yamamoto",
+  "zhou_xiaoyi": "Yuriko_Yamamoto",
+  "zhou xiaoyi": "Yuriko_Yamamoto",
+  "yuriko yamamoto": "Yuriko_Yamamoto",
+  "yuriko_yamamoto": "Yuriko_Yamamoto",
+
+  // 扩展映射：新角色
+  "韩小雪": "Tamara_Taylor",
+  "hanxiaoxue": "Tamara_Taylor",
+  "han_xiaoxue": "Tamara_Taylor",
+  "han xiaoxue": "Tamara_Taylor",
+  "tamara taylor": "Tamara_Taylor",
+  "tamara_taylor": "Tamara_Taylor",
+
+  "张国庆": "Sam_Moore",
+  "zhangguoqing": "Sam_Moore",
+  "zhang_guoqing": "Sam_Moore",
+  "zhang guoqing": "Sam_Moore",
+
+  "刘小敏": "Hailey_Johnson",
+  "liuxiaomin": "Hailey_Johnson",
+  "liu_xiaomin": "Hailey_Johnson",
+  "liu xiaomin": "Hailey_Johnson",
+  "hailey johnson": "Hailey_Johnson",
+  "hailey_johnson": "Hailey_Johnson",
+
+  "教育局代表": "Tom_Moreno",
+  "jiaoyuju daibiao": "Tom_Moreno",
+  "jiaoyuju_daibiao": "Tom_Moreno",
+  "tom moreno": "Tom_Moreno",
+  "tom_moreno": "Tom_Moreno",
+
+  "市场专家": "Mei_Lin",
+  "shichang zhuanjia": "Mei_Lin",
+  "shichang_zhuanjia": "Mei_Lin",
+  "mei lin": "Mei_Lin",
+  "mei_lin": "Mei_Lin",
+
+  "公共卫生专家": "Jennifer_Moore",
+  "gonggong weisheng zhuanjia": "Jennifer_Moore",
+  "gonggong_weisheng_zhuanjia": "Jennifer_Moore",
+  "jennifer moore": "Jennifer_Moore",
+  "jennifer_moore": "Jennifer_Moore",
+
+  "主持人": "Abigail_Chen",
+  "zhuchiren": "Abigail_Chen",
+  "zhu_chi_ren": "Abigail_Chen",
+  "abigail chen": "Abigail_Chen",
+  "abigail_chen": "Abigail_Chen",
+
+  // 最新从前端实际打印的英文名称
+  "wang lihua": "Carmen_Ortiz",
+  "gao jianguo": "Sam_Moore",
+  "lin xiaoyu": "Isabella_Rodriguez",
+  "li daqiang": "John_Lin",
+  "chen siyuan": "Arthur_Burton",
+  "zhou xiaoyi": "Yuriko_Yamamoto",
+  "zhang guoqing": "Sam_Moore",
+  "liu xiaomin": "Hailey_Johnson",
+  "han xiaoxue": "Tamara_Taylor",
+  "public health expert": "Jennifer_Moore",
+  "public_health_expert": "Jennifer_Moore",
+  "market supervision expert": "Mei_Lin",
+  "market_supervision_expert": "Mei_Lin",
+  "education bureau representative": "Tom_Moreno",
+  "education_bureau_representative": "Tom_Moreno",
+  "meeting moderator": "Abigail_Chen",
+  "meeting_moderator": "Abigail_Chen",
+};
+const characterAtlasJsonPath = "{% static 'assets/characters/atlas.json' %}";
+// 需要预加载的角色贴图源
+const characterAtlasSources = {
+  "Carmen_Ortiz": "{% static 'assets/characters/Carmen_Ortiz.png' %}",
+  "Sam_Moore": "{% static 'assets/characters/Sam_Moore.png' %}",
+  "Isabella_Rodriguez": "{% static 'assets/characters/Isabella_Rodriguez.png' %}",
+  "John_Lin": "{% static 'assets/characters/John_Lin.png' %}",
+  "Arthur_Burton": "{% static 'assets/characters/Arthur_Burton.png' %}",
+  "Yuriko_Yamamoto": "{% static 'assets/characters/Yuriko_Yamamoto.png' %}",
+  "Tamara_Taylor": "{% static 'assets/characters/Tamara_Taylor.png' %}",
+  "Hailey_Johnson": "{% static 'assets/characters/Hailey_Johnson.png' %}",
+  "Tom_Moreno": "{% static 'assets/characters/Tom_Moreno.png' %}",
+  "Mei_Lin": "{% static 'assets/characters/Mei_Lin.png' %}",
+  "Jennifer_Moore": "{% static 'assets/characters/Jennifer_Moore.png' %}",
+  "Abigail_Chen": "{% static 'assets/characters/Abigail_Chen.png' %}",
+};
+const defaultPersonaTexture = "Yuriko_Yamamoto";
+const normalizePersonaName = (name) => (name || "").toString().trim().toLowerCase().replace(/\s+/g, " ").replace(/ /g, "_");
+const getPersonaAtlasKey = (name) => {
+  const direct = personaTextureMap[name];
+  if (direct) return direct;
+  const normalized = normalizePersonaName(name);
+  return personaTextureMap[normalized] || defaultPersonaTexture;
+};
+
+
 	// Phaser 3.0 global settings. 
 	// Configuration meant to be passed to the main Phaser game instance. 
 	const config = {
@@ -182,6 +316,15 @@
 	  this.load.atlas("atlas", 
 	                  "{% static 'assets/atlas/atlas.png' %}", 
 	                  "{% static 'assets/atlas/atlas.json' %}");
+
+  // 预加载角色贴图（人物专属）
+  const atlasesToLoad = new Set([defaultPersonaTexture]);
+  Object.values(personaTextureMap).forEach((key) => atlasesToLoad.add(key));
+  atlasesToLoad.forEach((atlasKey) => {
+    if (characterAtlasSources[atlasKey]) {
+      this.load.atlas(atlasKey, characterAtlasSources[atlasKey], characterAtlasJsonPath);
+    }
+  });
 	}
 
 	function create() {  
@@ -284,10 +427,14 @@
 	    let persona_name = Object.keys(spawn_tile_loc)[i];
 	    let start_pos = [spawn_tile_loc[persona_name][0] * tile_width + tile_width / 2, 
 	                     spawn_tile_loc[persona_name][1] * tile_width + tile_width];
+    const atlasKey = getPersonaAtlasKey(persona_name);
 	    let new_sprite = this.physics.add
-	                         .sprite(start_pos[0], start_pos[1], "atlas", "misa-front")
+                         .sprite(start_pos[0], start_pos[1], atlasKey, "down")
 	                         .setSize(30, 40)
-	                         .setOffset(0, 32); // DEBUG 1 --- I added 32 offset on Dec 29. 
+                         .setOffset(0, 0);
+    // 适当放大角色，避免过小
+    new_sprite.displayWidth = 40;
+    new_sprite.scaleY = new_sprite.scaleX;
 	    // Here, we are creating the persona and its pronunciatio sprites.
 	    personas[persona_name] = new_sprite;
 	    pronunciatios[persona_name] = this.add.text(
@@ -305,29 +452,34 @@
 	  // Create the player's walking animations from the texture atlas. These are
 	  // stored in the global animation manager so any sprite can access them.
 	  const anims = this.anims;
-	  anims.create({
-	    key: "misa-left-walk",
-	    frames: anims.generateFrameNames("atlas", { prefix: "misa-left-walk.", start: 0, end: 3, zeroPad: 3 }),
-	    frameRate: 4,
-	    repeat: -1 });
+  for (let i=0; i<Object.keys(spawn_tile_loc).length; i++) { 
+    let persona_name = Object.keys(spawn_tile_loc)[i];
+    const atlasKey = getPersonaAtlasKey(persona_name);
+    const prefix = "";
+    anims.create({
+      key: persona_name + "-left-walk",
+      frames: anims.generateFrameNames(atlasKey, { prefix: prefix + "left-walk.", start: 0, end: 3, zeroPad: 3 }),
+      frameRate: 4,
+      repeat: -1 });
 
-	  anims.create({
-	    key: "misa-right-walk",
-	    frames: anims.generateFrameNames("atlas", { prefix: "misa-right-walk.", start: 0, end: 3, zeroPad: 3 }),
-	    frameRate: 4,
-	    repeat: -1 });
+    anims.create({
+      key: persona_name + "-right-walk",
+      frames: anims.generateFrameNames(atlasKey, { prefix: prefix + "right-walk.", start: 0, end: 3, zeroPad: 3 }),
+      frameRate: 4,
+      repeat: -1 });
 
-	  anims.create({
-	    key: "misa-front-walk",
-	    frames: anims.generateFrameNames("atlas", { prefix: "misa-front-walk.", start: 0, end: 3, zeroPad: 3 }),
-	    frameRate: 4,
-	    repeat: -1 });
+    anims.create({
+      key: persona_name + "-front-walk",
+      frames: anims.generateFrameNames(atlasKey, { prefix: prefix + "down-walk.", start: 0, end: 3, zeroPad: 3 }),
+      frameRate: 4,
+      repeat: -1 });
 
-	  anims.create({
-	    key: "misa-back-walk",
-	    frames: anims.generateFrameNames("atlas", { prefix: "misa-back-walk.", start: 0, end: 3, zeroPad: 3 }),
-	    frameRate: 4,
-	    repeat: -1 });
+    anims.create({
+      key: persona_name + "-back-walk",
+      frames: anims.generateFrameNames(atlasKey, { prefix: prefix + "up-walk.", start: 0, end: 3, zeroPad: 3 }),
+      frameRate: 4,
+      repeat: -1 });
+  }
 	  
 	  // 显示初始时间（如果存在）
 	  const initialTimeEl = document.getElementById('initial_time');
@@ -564,22 +716,27 @@
 	        curr_pronunciatio.x = curr_persona.body.x - 6; 
           curr_pronunciatio.y = curr_persona.body.y - 42 - 32; // DEBUG 1 --- I added 32 offset on Dec 29. 
 
+          const left_walk_name = curr_persona_name + "-left-walk";
+          const right_walk_name = curr_persona_name + "-right-walk";
+          const back_walk_name = curr_persona_name + "-back-walk";
+          const front_walk_name = curr_persona_name + "-front-walk";
           if (anims_direction == "l") {
-			      curr_persona.anims.play("misa-left-walk", true);
+			      curr_persona.anims.play(left_walk_name, true);
 			    } else if (anims_direction == "r") {
-			      curr_persona.anims.play("misa-right-walk", true);
+			      curr_persona.anims.play(right_walk_name, true);
 			    } else if (anims_direction == "u") {
-			      curr_persona.anims.play("misa-back-walk", true);
+			      curr_persona.anims.play(back_walk_name, true);
 			    } else if (anims_direction == "d") {
-			      curr_persona.anims.play("misa-front-walk", true);
+			      curr_persona.anims.play(front_walk_name, true);
 			    } else {
 			      curr_persona.anims.stop();
 
 			      // If we were moving, pick an idle frame to use
-			      if (pre_anims_direction_dict[curr_persona_name] == "l") curr_persona.setTexture("atlas", "misa-left");else
-			      if (pre_anims_direction_dict[curr_persona_name] == "r") curr_persona.setTexture("atlas", "misa-right");else
-			      if (pre_anims_direction_dict[curr_persona_name] == "u") curr_persona.setTexture("atlas", "misa-back");else
-			      if (pre_anims_direction_dict[curr_persona_name] == "d") curr_persona.setTexture("atlas", "misa-front");
+			      const atlasKey = getPersonaAtlasKey(curr_persona_name);
+			      if (pre_anims_direction_dict[curr_persona_name] == "l") curr_persona.setTexture(atlasKey, "left");else
+			      if (pre_anims_direction_dict[curr_persona_name] == "r") curr_persona.setTexture(atlasKey, "right");else
+			      if (pre_anims_direction_dict[curr_persona_name] == "u") curr_persona.setTexture(atlasKey, "up");else
+			      if (pre_anims_direction_dict[curr_persona_name] == "d") curr_persona.setTexture(atlasKey, "down");
 			    };
 
 	      } 

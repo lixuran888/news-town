@@ -160,7 +160,7 @@ def demo(request, sim_code, step, play_speed="2"):
 
   # Loading the basic meta information about the simulation.
   meta = dict() 
-  with open (meta_file) as json_file: 
+  with open(meta_file, encoding="utf-8") as json_file: 
     meta = json.load(json_file)
 
   sec_per_step = meta["sec_per_step"]
@@ -172,7 +172,7 @@ def demo(request, sim_code, step, play_speed="2"):
 
   # Loading the movement file
   raw_all_movement = dict()
-  with open(move_file) as json_file: 
+  with open(move_file, encoding="utf-8") as json_file: 
     raw_all_movement = json.load(json_file)
  
   # Loading all names of the personas
@@ -237,10 +237,10 @@ def home(request):
     template = "home/error_start_backend.html"
     return render(request, template, context)
 
-  with open(f_curr_sim_code) as json_file:  
+  with open(f_curr_sim_code, encoding="utf-8") as json_file:  
     sim_code = json.load(json_file)["sim_code"]
   
-  with open(f_curr_step) as json_file:  
+  with open(f_curr_step, encoding="utf-8") as json_file:  
     step = json.load(json_file)["step"]
 
   os.remove(f_curr_step)
@@ -260,7 +260,7 @@ def home(request):
     if x[0] != ".": 
       file_count += [int(x.split(".")[0])]
   curr_json = f'storage/{sim_code}/environment/{str(max(file_count))}.json'
-  with open(curr_json) as json_file:  
+  with open(curr_json, encoding="utf-8") as json_file:  
     persona_init_pos_dict = json.load(json_file)
     for key, val in persona_init_pos_dict.items(): 
       if key in persona_names_set: 
@@ -306,7 +306,7 @@ def replay(request, sim_code, step):
     if x[0] != ".": 
       file_count += [int(x.split(".")[0])]
   curr_json = f'storage/{sim_code}/environment/{str(max(file_count))}.json'
-  with open(curr_json) as json_file:  
+  with open(curr_json, encoding="utf-8") as json_file:  
     persona_init_pos_dict = json.load(json_file)
     for key, val in persona_init_pos_dict.items(): 
       if key in persona_names_set: 

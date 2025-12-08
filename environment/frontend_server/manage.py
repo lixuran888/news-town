@@ -5,6 +5,8 @@ import sys
 
 
 def main():
+    # Force UTF-8 default encoding to avoid GBK decode issues on Windows
+    os.environ.setdefault("PYTHONUTF8", "1")
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'frontend_server.settings')
     try:
         from django.core.management import execute_from_command_line

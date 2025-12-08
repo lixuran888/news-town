@@ -24,7 +24,8 @@
 <div class="agent-status-bar">
 	<div class="status-bar-content">
 		{% for p_name, p_name_os in persona_names %}
-			<div class="agent-status-item" onclick="togglePersonaDetails('{{ p_name_os }}')">
+			<div class="agent-status-item" data-persona-name="{{ p_name }}" data-persona-name-os="{{ p_name_os }}" onclick="togglePersonaDetails('{{ p_name_os }}')">
+        <img class="agent-status-avatar" src="{% static 'img/logo.svg' %}" alt="{{p_name}}" onerror="this.style.display='none';">
 				<span class="agent-status-name" id="name__{{ p_name_os }}">{{p_name}}</span>
 				<button type="button" class="btn btn-xs btn-info state-details-btn" 
 				        data-persona-name="{{ p_name }}" 
@@ -74,6 +75,24 @@
         </div>
       </div>
       <div class="expert-thinking-indicator" id="expert-thinking"></div>
+    </div>
+  </section>
+</div>
+
+<!-- 角色详情弹窗（木质风格，与地图弹窗同高） -->
+<div id="persona-detail-overlay" class="persona-detail-overlay" style="display:none;">
+  <section class="persona-detail-board">
+    <header class="persona-detail-header">
+      <div>
+        <span class="persona-detail-title">👤 角色详情</span>
+        <span class="persona-detail-subtitle" id="persona-detail-name"></span>
+      </div>
+      <div class="persona-detail-actions">
+        <button class="persona-detail-close" id="persona-detail-close" aria-label="关闭弹窗">×</button>
+      </div>
+    </header>
+    <div class="persona-detail-body" id="persona-detail-body">
+      <div class="persona-detail-loading">加载中...</div>
     </div>
   </section>
 </div>
@@ -209,7 +228,147 @@
   font-family: 'Microsoft YaHei', Arial, sans-serif;
 }
 
+/* 角色详情弹窗（木质风格，与地图同高） */
+.persona-detail-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 2001;
+  display: none;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 20px;
+}
 
+.persona-detail-board {
+  width: 680px;
+  max-width: calc(100vw - 32px);
+  height: calc(100vh - 120px);
+  max-height: calc(100vh - 120px);
+  background: #F5F5DC;
+  border: 8px solid #8B6F47;
+  border-radius: 12px;
+  box-shadow: 0 0 0 4px #A0826D, 0 6px 18px rgba(0,0,0,0.35), inset 0 2px 4px rgba(255,255,255,0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: #3D2817;
+  font-family: 'Microsoft YaHei', Arial, sans-serif;
+}
+
+.persona-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, #A0826D 0%, #8B6F47 100%);
+  color: #FFF8E7;
+  border-bottom: 3px solid #6B4E3D;
+}
+
+.persona-detail-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.persona-detail-subtitle {
+  display: block;
+  font-size: 13px;
+  color: #F2E6D9;
+}
+
+.persona-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.persona-detail-close {
+  background: #6B4E3D;
+  color: #FFF8E7;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  font-size: 20px;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+.persona-detail-close:hover {
+  box-shadow: 0 0 0 2px #F5F5DC;
+  transform: scale(1.05);
+}
+
+.persona-detail-body {
+  flex: 1;
+  padding: 16px;
+  background: #E8D5B7;
+  overflow-y: auto;
+}
+
+.persona-detail-section {
+  background: #F5E6D3;
+  border: 2px solid #8B6F47;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  box-shadow: inset 0 1px 2px rgba(255,255,255,0.4);
+}
+
+.persona-detail-section h3 {
+  margin: 0 0 8px 0;
+  font-size: 15px;
+  color: #5A3E2B;
+  border-bottom: 1px solid #C9AC8A;
+  padding-bottom: 6px;
+}
+
+.persona-detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.persona-detail-table td {
+  padding: 6px 4px;
+  vertical-align: top;
+}
+
+.persona-detail-table td.label {
+  width: 28%;
+  font-weight: 700;
+  color: #6B4E3D;
+}
+
+.persona-detail-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.persona-detail-loading {
+  text-align: center;
+  padding: 40px 0;
+  color: #6B4E3D;
+}
+
+.persona-detail-sentiments {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.persona-detail-chip {
+  background: #fff;
+  border: 1px solid #C9AC8A;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+</style>
+<style>
 .expert-board-header {
   display: flex;
   justify-content: space-between;
@@ -1155,6 +1314,17 @@ function renderPersonaState(data) {
     box-shadow: none;
 }
 
+.agent-status-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    object-fit: cover;
+    margin-right: 6px;
+    border: 2px solid #8B6F47;
+    background: #F5E6D3;
+    flex-shrink: 0;
+}
+
 .agent-status-name {
     color: #3D2817;
     font-size: 14px;
@@ -1185,6 +1355,7 @@ function renderPersonaState(data) {
     box-shadow: none;
     opacity: 0;
     transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+    display: none;
 }
 
 .persona-details-panel.show {
@@ -1403,6 +1574,163 @@ function togglePersonaDetails(personaNameOs) {
         }
     }
 }
+
+// 详情按钮点击事件：确保按钮本身也能打开/切换详情
+(function() {
+    const detailButtons = document.querySelectorAll('.state-details-btn');
+    detailButtons.forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const personaNameOs = btn.dataset.personaNameOs;
+            const simCode = btn.dataset.simCode;
+            const step = btn.dataset.step;
+            // 打开弹窗并加载详细信息
+            if (simCode && step && personaNameOs) {
+                openPersonaDetailModal({ simCode, step, personaNameOs });
+            }
+        });
+    });
+})();
+
+// 打开角色详情弹窗（木质风格）
+function openPersonaDetailModal({ simCode, step, personaNameOs }) {
+    const overlay = document.getElementById('persona-detail-overlay');
+    const body = document.getElementById('persona-detail-body');
+    const nameEl = document.getElementById('persona-detail-name');
+    if (!overlay || !body || !nameEl) return;
+
+    overlay.style.display = 'flex';
+    body.innerHTML = '<div class="persona-detail-loading">加载中...</div>';
+    nameEl.textContent = personaNameOs;
+
+    const url = `/replay_persona_state/${encodeURIComponent(simCode)}/${encodeURIComponent(step)}/${encodeURIComponent(personaNameOs)}/?format=json`;
+    fetch(url)
+      .then(res => {
+        if (!res.ok) throw new Error('加载失败');
+        return res.json();
+      })
+      .then(data => {
+        renderPersonaDetail(body, data);
+        nameEl.textContent = data.persona_name || personaNameOs;
+      })
+      .catch(err => {
+        body.innerHTML = `<div class="persona-detail-loading">加载失败：${err.message}</div>`;
+      });
+}
+
+// 初始化状态栏头像，使用与贴图一致的映射
+(function() {
+    const profileBase = "{% static 'assets/characters/profile/' %}";
+    const cacheBust = Date.now(); // 防浏览器缓存旧头像
+    document.querySelectorAll('.agent-status-item').forEach(item => {
+        const personaNameOs = item.dataset.personaNameOs;
+        const personaName = item.dataset.personaName;
+        const avatar = item.querySelector('.agent-status-avatar');
+        if (!avatar) return;
+        const atlasKey = getPersonaAtlasKey(personaNameOs) || getPersonaAtlasKey(personaName);
+        const fallbackKey = (personaNameOs || "").replace(/ /g, "_");
+        const src = atlasKey ? (profileBase + atlasKey + ".png") : (profileBase + fallbackKey + ".png");
+        avatar.src = src + "?v=" + cacheBust;
+        avatar.onerror = function() {
+          // 二级回退：尝试 personaNameOs 文件；再失败则隐藏
+          if (avatar.dataset.triedFallback !== "1") {
+            avatar.dataset.triedFallback = "1";
+            avatar.src = profileBase + fallbackKey + ".png" + "?v=" + cacheBust;
+          } else {
+            avatar.style.display = 'none';
+          }
+        };
+    });
+})();
+
+// 渲染角色详情内容
+function renderPersonaDetail(container, data) {
+    const scratch = data.scratch || {};
+    const sentiment = data.sentiment_stats || {};
+    const listHtml = (arr) => {
+        if (!arr || !arr.length) return '<span>--</span>';
+        return `<ol class="persona-detail-list">${arr.map(x => `<li>${x}</li>`).join('')}</ol>`;
+    };
+    const memList = (arr, title) => {
+        if (!arr || !arr.length) return `<div class="persona-detail-section"><h3>${title}</h3><div>--</div></div>`;
+        return `<div class="persona-detail-section"><h3>${title}</h3><div>${arr.map(n => `<div style="margin-bottom:6px;">${n.description || ''}</div>`).join('')}</div></div>`;
+    };
+    const sentimentChips = (sentiment.chat_sentiments || []).map(item => {
+        return `<span class="persona-detail-chip">${item.emoji || ''} ${item.label || ''} (${item.score}) - ${item.description || ''}</span>`;
+    }).join('');
+
+    container.innerHTML = `
+      <div class="persona-detail-section">
+        <h3>基本信息</h3>
+        <table class="persona-detail-table">
+          <tr><td class="label">姓名</td><td>${data.persona_name || '--'}</td></tr>
+          <tr><td class="label">年龄</td><td>${scratch.age || '--'}</td></tr>
+          <tr><td class="label">当前时间</td><td>${scratch.curr_time || '--'}</td></tr>
+          <tr><td class="label">当前位置</td><td>${scratch.curr_tile || '--'}</td></tr>
+        </table>
+      </div>
+
+      <div class="persona-detail-section">
+        <h3>设置</h3>
+        <table class="persona-detail-table">
+          <tr><td class="label">视野半径</td><td>${scratch.vision_r || '--'}</td></tr>
+          <tr><td class="label">注意力带宽</td><td>${scratch.att_bandwidth || '--'}</td></tr>
+          <tr><td class="label">保持度</td><td>${scratch.retention || '--'}</td></tr>
+        </table>
+      </div>
+
+      <div class="persona-detail-section">
+        <h3>性格与生活</h3>
+        <table class="persona-detail-table">
+          <tr><td class="label">天生倾向</td><td>${scratch.innate || '--'}</td></tr>
+          <tr><td class="label">习得倾向</td><td>${scratch.learned || '--'}</td></tr>
+          <tr><td class="label">当前状态</td><td>${scratch.currently || '--'}</td></tr>
+          <tr><td class="label">生活方式</td><td>${scratch.lifestyle || '--'}</td></tr>
+        </table>
+      </div>
+
+      <div class="persona-detail-section">
+        <h3>当前行动</h3>
+        <table class="persona-detail-table">
+          <tr><td class="label">日常需求</td><td>${listHtml(scratch.daily_req)}</td></tr>
+          <tr><td class="label">日程</td><td>${listHtml(scratch.f_daily_schedule)}</td></tr>
+          <tr><td class="label">地址</td><td>${scratch.act_address || '--'}</td></tr>
+          <tr><td class="label">开始时间</td><td>${scratch.act_start_time || '--'}</td></tr>
+          <tr><td class="label">持续时间</td><td>${scratch.act_duration || '--'}</td></tr>
+          <tr><td class="label">描述</td><td>${scratch.act_description || '--'}</td></tr>
+          <tr><td class="label">Pronunciatio</td><td>${scratch.act_pronunciatio || '--'}</td></tr>
+        </table>
+      </div>
+
+      ${memList(data.a_mem_event, '事件记忆')}
+      ${memList(data.a_mem_chat, '对话记忆')}
+      ${memList(data.a_mem_thought, '思考记忆')}
+
+      <div class="persona-detail-section">
+        <h3>情感统计</h3>
+        <div class="persona-detail-sentiments">
+          <span class="persona-detail-chip">总对话：${sentiment.total_chats || 0}</span>
+          <span class="persona-detail-chip">正向：${sentiment.positive_count || 0}</span>
+          <span class="persona-detail-chip">中性：${sentiment.neutral_count || 0}</span>
+          <span class="persona-detail-chip">负向：${sentiment.negative_count || 0}</span>
+          <span class="persona-detail-chip">平均分：${sentiment.average_score || 0}</span>
+        </div>
+        <div style="margin-top:8px;">${sentimentChips || '--'}</div>
+      </div>
+    `;
+}
+
+// 关闭角色详情弹窗
+(function() {
+    const overlay = document.getElementById('persona-detail-overlay');
+    const closeBtn = document.getElementById('persona-detail-close');
+    if (closeBtn && overlay) {
+        closeBtn.addEventListener('click', () => { overlay.style.display = 'none'; });
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) overlay.style.display = 'none';
+        });
+    }
+})();
 
 // 点击详情面板外部区域关闭面板
 (function() {
