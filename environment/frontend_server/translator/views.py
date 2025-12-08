@@ -789,11 +789,28 @@ def start_time_setup(request):
       initial_date_iso = "2023-02-13"
       initial_time_iso = "00:00"
   
-  # 处理 POST 请求：保存开始时间
+  # 读取模型配置
+  use_local_model, local_model_name = start_time_config.load_model_config()
+  if use_local_model is None:
+    use_local_model = False  # 默认关闭本地模型，使用云端API
+  if not local_model_name:
+    local_model_name = "deepseek-R1:8b"  # 默认模型名称（仅在开启时使用）
+  
+  # 处理 POST 请求：保存开始时间和模型配置
   if request.method == "POST":
     try:
       start_date_str = request.POST.get("start_date", "").strip()
       start_time_str = request.POST.get("start_time", "00:00").strip()
+      
+      # 读取模型配置
+      # checkbox 如果选中会发送 "true" 或 "on"，如果未选中则不会发送该字段
+      use_local_model_post = request.POST.get("use_local_model", "")
+      use_local_model_bool = use_local_model_post.lower() in ["true", "on"] or use_local_model_post == "true"
+      local_model_name_post = request.POST.get("local_model_name", "").strip()
+      
+      # 调试信息
+      print(f"[start_time_setup] 表单提交 - use_local_model_post: '{use_local_model_post}', use_local_model_bool: {use_local_model_bool}")
+      print(f"[start_time_setup] 表单提交 - local_model_name_post: '{local_model_name_post}'")
       
       if not start_date_str:
         error = "请选择开始日期"
@@ -807,8 +824,20 @@ def start_time_setup(request):
         formatted_time = time_part.strftime("%H:%M:%S")   # "17:00:00"
         formatted_curr_time = f"{formatted_date}, {formatted_time}"
         
-        # 保存到独立配置文件
+        # 保存开始时间
         if start_time_config.save_start_time(formatted_date, formatted_curr_time):
+          # 保存模型配置
+          if use_local_model_bool:
+            # 如果开关打开，必须提供模型名称
+            if local_model_name_post:
+              start_time_config.save_model_config(True, local_model_name_post)
+            else:
+              # 如果模型名称为空，使用默认值
+              start_time_config.save_model_config(True, "deepseek-R1:8b")
+          else:
+            # 如果开关关闭，保存为 False，不保存模型名称
+            start_time_config.save_model_config(False, "")
+          
           # 保存成功后重定向到 simulator_home
           return redirect('home')
         else:
@@ -826,6 +855,8 @@ def start_time_setup(request):
     "current_curr_time": current_curr_time,
     "initial_date_iso": initial_date_iso or "2023-02-13",
     "initial_time_iso": initial_time_iso or "00:00",
+    "use_local_model": use_local_model,
+    "local_model_name": local_model_name,
     "error": error,
     "message": message,
   }

@@ -42,17 +42,89 @@ def save_start_time(start_date, curr_time):
     """
     try:
         CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        # 读取现有配置（如果有）
+        existing_data = {}
+        if CONFIG_FILE.exists():
+            try:
+                with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                    existing_data = json.load(f)
+            except:
+                pass
+        
         data = {
             "start_date": start_date,
             "curr_time": curr_time,
             "updated_at": datetime.datetime.now().isoformat()
         }
+        # 保留模型配置（如果存在）
+        if "use_local_model" in existing_data:
+            data["use_local_model"] = existing_data["use_local_model"]
+        if "local_model_name" in existing_data:
+            data["local_model_name"] = existing_data["local_model_name"]
+        
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
         print(f"[start_time_config] 已保存开始时间: {start_date} / {curr_time}")
         return True
     except Exception as e:
         print(f"[start_time_config] 保存配置失败: {e}")
+        return False
+
+def load_model_config():
+    """
+    读取模型配置
+    返回: (use_local_model, local_model_name) 或 (None, None)
+    """
+    if not CONFIG_FILE.exists():
+        return None, None
+    
+    try:
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        use_local_model = data.get("use_local_model")
+        local_model_name = data.get("local_model_name")
+        return use_local_model, local_model_name
+    except Exception as e:
+        print(f"[start_time_config] 读取模型配置失败: {e}")
+    
+    return None, None
+
+def save_model_config(use_local_model, local_model_name):
+    """
+    保存模型配置
+    use_local_model: bool, 是否使用本地模型
+    local_model_name: str, 本地模型名称
+    """
+    try:
+        CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        # 读取现有配置（如果有）
+        existing_data = {}
+        if CONFIG_FILE.exists():
+            try:
+                with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                    existing_data = json.load(f)
+            except:
+                pass
+        
+        data = existing_data.copy()
+        data["use_local_model"] = use_local_model
+        data["local_model_name"] = local_model_name
+        data["model_config_updated_at"] = datetime.datetime.now().isoformat()
+        
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        print(f"[start_time_config] ✅ 已保存模型配置: use_local_model={use_local_model}, model={local_model_name}")
+        print(f"[start_time_config] 📁 配置文件路径: {CONFIG_FILE}")
+        # 验证保存是否成功
+        if CONFIG_FILE.exists():
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                saved_data = json.load(f)
+            print(f"[start_time_config] ✅ 验证保存成功: use_local_model={saved_data.get('use_local_model')}, local_model_name={saved_data.get('local_model_name')}")
+        return True
+    except Exception as e:
+        import traceback
+        print(f"[start_time_config] ❌ 保存模型配置失败: {e}")
+        print(f"[start_time_config] 错误详情: {traceback.format_exc()}")
         return False
 
 def get_default_time():
