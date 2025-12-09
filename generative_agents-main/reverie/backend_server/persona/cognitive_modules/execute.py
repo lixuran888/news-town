@@ -32,6 +32,21 @@ def execute(persona, maze, personas, plan):
   OUTPUT: 
     execution
   """
+  # 若 plan 异常缺失，直接保持原地以避免后续 None 下标错误
+  if not isinstance(plan, str) or not plan.strip():
+    fallback_tile = persona.scratch.curr_tile or (0, 0)
+    persona.scratch.curr_tile = fallback_tile
+    return fallback_tile, "...", "idle (invalid plan)"
+
+  # 防御性校验：curr_tile 可能在某些专家/主持人场景下未被写入
+  curr_tile = persona.scratch.curr_tile
+  if (not isinstance(curr_tile, (list, tuple)) or len(curr_tile) < 2 
+      or curr_tile[0] is None or curr_tile[1] is None):
+    # 回退到 (0,0)，并写回 scratch，避免 path_finder 处理 None 时报错
+    print(f"[execute] WARNING: invalid curr_tile for {persona.name}: {curr_tile}, fallback to (0,0)")
+    curr_tile = (0, 0)
+    persona.scratch.curr_tile = curr_tile
+
   if "<random>" in plan and persona.scratch.planned_path == []: 
     persona.scratch.act_path_set = False
 
