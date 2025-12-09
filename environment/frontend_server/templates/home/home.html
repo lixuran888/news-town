@@ -6,7 +6,7 @@
 <div class="map-container">
   <div class="map-header">
     <h2>🗺️ 世界地图</h2>
-    <div class="map-controls" style="{% if mode == 'simulate' %} display: none {% endif %}">
+    <div class="map-controls {% if mode == 'simulate' %}is-hidden{% endif %}">
       <button id="play_button" type="button" class="btn btn-xs btn-default" style="margin-right: 5px;">
         <i class="glyphicon glyphicon-play"></i> Play
       </button>
@@ -145,6 +145,9 @@
     display: flex;
     align-items: center;
     gap: 5px;
+}
+.map-controls.is-hidden {
+    display: none;
 }
 
 .map-content {
@@ -1572,6 +1575,18 @@ function togglePersonaDetails(personaNameOs) {
         if (statusItem) {
             statusItem.classList.add('active');
         }
+    }
+}
+
+// 供地图/任务点击调用：滚动到对应角色并高亮/展开
+function focusPersonaStatus(personaNameOs) {
+    if (typeof togglePersonaDetails === 'function') {
+        togglePersonaDetails(personaNameOs);
+    }
+    const statusItem = document.querySelector(`.agent-status-item[data-persona-name-os="${personaNameOs}"]`);
+    if (statusItem) {
+        statusItem.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        statusItem.classList.add('active');
     }
 }
 
