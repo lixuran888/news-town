@@ -357,9 +357,9 @@ def generate_prompt(curr_input, prompt_lib_file):
     curr_input = [curr_input]
   curr_input = [str(i) for i in curr_input]
 
-  f = open(prompt_lib_file, "r")
-  prompt = f.read()
-  f.close()
+  # 显式指定 UTF-8，避免在 Windows 默认 GBK 下读取含特殊符号的模板时报错
+  with open(prompt_lib_file, "r", encoding="utf-8") as f:
+    prompt = f.read()
   for count, i in enumerate(curr_input):   
     prompt = prompt.replace(f"!<INPUT {count}>!", i)
   if "<commentblockmarker>###</commentblockmarker>" in prompt: 
