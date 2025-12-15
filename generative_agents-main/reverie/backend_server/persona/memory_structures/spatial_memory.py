@@ -36,7 +36,7 @@ class MemoryTree:
     
 
   def save(self, out_json):
-    with open(out_json, "w") as outfile:
+    with open(out_json, "w", encoding='utf-8') as outfile:
       json.dump(self.tree, outfile) 
 
 

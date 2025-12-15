@@ -403,18 +403,44 @@ def safe_generate_response(prompt,
   return fail_safe_response
 
 
-def get_embedding(text, model="text-embedding-ada-002"):
+def get_embedding(text, model="text-embedding-3-small"):
   text = text.replace("\n", " ")
   if not text: 
     text = "this is blank"
-  # 注意：DeepSeek 可能不支持 embedding，如果报错需要改用其他 embedding 服务
+  
+  # 使用 API2D 的 OpenAI Embedding API
+  from utils import openai_api_key, OPENAI_API_BASE, OPENAI_EMBEDDING_MODEL
+  
+  # 保存原来的 API 配置
+  original_api_base = openai.api_base
+  original_api_key = openai.api_key
+  
   try:
-    return openai.Embedding.create(
-            input=[text], model=model)['data'][0]['embedding']
-  except:
-    # 如果 DeepSeek 不支持，可以返回一个默认向量或使用其他服务
-    print("Warning: Embedding not supported, returning default vector")
-    return [0.0] * 1536  # 默认维度，根据实际需要调整
+    # 临时切换到 OpenAI API（API2D）
+    openai.api_base = OPENAI_API_BASE
+    openai.api_key = openai_api_key
+    
+    response = openai.Embedding.create(
+      input=[text],
+      model=OPENAI_EMBEDDING_MODEL
+    )
+    
+    embedding = response['data'][0]['embedding']
+    
+    # 恢复原来的 API 配置
+    openai.api_base = original_api_base
+    openai.api_key = original_api_key
+    
+    return embedding
+    
+  except Exception as e:
+    # 恢复原来的 API 配置
+    openai.api_base = original_api_base
+    openai.api_key = original_api_key
+    
+    print(f"[Embedding] ❌ 失败: {e}")
+    print(f"[Embedding] 请检查 API2D 余额或网络连接")
+    return [0.0] * 1536  # 返回默认向量
 
 
 if __name__ == '__main__':

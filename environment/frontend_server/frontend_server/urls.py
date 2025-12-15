@@ -39,5 +39,7 @@ urlpatterns = [
     url(r'^online_forum/$', translator_views.online_forum, name='online_forum'),
     url(r'^get_online_posts/$', translator_views.get_online_posts, name='get_online_posts'),
     url(r'^post_online_opinion/$', translator_views.post_online_opinion, name='post_online_opinion'),
+    # 舆论与情感时间序列
+    url(r'^sentiment_timeline/$', translator_views.sentiment_timeline, name='sentiment_timeline'),
     path('admin/', admin.site.urls),
 ]

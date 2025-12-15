@@ -550,6 +550,160 @@
 	// Control button binders
 	var play_button=document.getElementById("play_button");
 	var pause_button=document.getElementById("pause_button");
+
+	// ========================
+	// Sentiment timeline popup
+	// ========================
+	var sentimentBtn = document.getElementById("sentiment_timeline_btn");
+	var sentimentModal = document.getElementById("sentiment_modal");
+	var sentimentClose = document.getElementById("sentiment_modal_close");
+	var sentimentCanvas = document.getElementById("sentiment_canvas");
+	var sentimentMeta = document.getElementById("sentiment_meta");
+
+	function drawSentimentChart(points) {
+		if (!sentimentCanvas || !sentimentCanvas.getContext) return;
+		var ctx = sentimentCanvas.getContext('2d');
+		var w = sentimentCanvas.width;
+		var h = sentimentCanvas.height;
+		ctx.clearRect(0, 0, w, h);
+
+		if (!points || points.length === 0) {
+			ctx.fillStyle = '#666';
+			ctx.font = '14px sans-serif';
+			ctx.fillText('暂无情感数据', 20, h / 2);
+			return;
+		}
+
+		// 计算 x/y 映射
+		var paddingLeft = 40;
+		var paddingRight = 20;
+		var paddingTop = 20;
+		var paddingBottom = 30;
+		var plotW = w - paddingLeft - paddingRight;
+		var plotH = h - paddingTop - paddingBottom;
+
+		var scores = points.map(function(p){ return p.avg_score; });
+		var minY = Math.min.apply(null, scores.concat([-1]));
+		var maxY = Math.max.apply(null, scores.concat([1]));
+		// 给一点 margin
+		var margin = 0.1;
+		minY -= margin;
+		maxY += margin;
+		if (minY === maxY) {
+			minY -= 1;
+			maxY += 1;
+		}
+
+		function xForIndex(i) {
+			if (points.length === 1) return paddingLeft + plotW / 2;
+			return paddingLeft + (plotW * i) / (points.length - 1);
+		}
+		function yForScore(s) {
+			var ratio = (s - minY) / (maxY - minY);
+			return paddingTop + (1 - ratio) * plotH;
+		}
+
+		// 画坐标轴
+		ctx.strokeStyle = '#999';
+		ctx.lineWidth = 1;
+		ctx.beginPath();
+		ctx.moveTo(paddingLeft, paddingTop);
+		ctx.lineTo(paddingLeft, paddingTop + plotH);
+		ctx.lineTo(paddingLeft + plotW, paddingTop + plotH);
+		ctx.stroke();
+
+		// 零线
+		if (0 >= minY && 0 <= maxY) {
+			var y0 = yForScore(0);
+			ctx.strokeStyle = '#ddd';
+			ctx.beginPath();
+			ctx.moveTo(paddingLeft, y0);
+			ctx.lineTo(paddingLeft + plotW, y0);
+			ctx.stroke();
+		}
+
+		// 折线
+		ctx.strokeStyle = '#007bff';
+		ctx.lineWidth = 2;
+		ctx.beginPath();
+		points.forEach(function(p, idx){
+			var x = xForIndex(idx);
+			var y = yForScore(p.avg_score);
+			if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+		});
+		ctx.stroke();
+
+		// 小圆点
+		ctx.fillStyle = '#007bff';
+		points.forEach(function(p, idx){
+			var x = xForIndex(idx);
+			var y = yForScore(p.avg_score);
+			ctx.beginPath();
+			ctx.arc(x, y, 3, 0, Math.PI * 2);
+			ctx.fill();
+		});
+
+		// y 轴刻度（-1, 0, 1）
+		ctx.fillStyle = '#555';
+		ctx.font = '11px sans-serif';
+		[1, 0, -1].forEach(function(v){
+			if (v < minY || v > maxY) return;
+			var y = yForScore(v);
+			ctx.fillText(v.toFixed(1), 5, y + 3);
+		});
+	}
+
+	function fetchSentimentTimeline() {
+		var xhr = new XMLHttpRequest();
+		xhr.open('GET', "{% url 'sentiment_timeline' %}", true);
+		xhr.onreadystatechange = function(){
+			if (xhr.readyState === 4) {
+				if (xhr.status === 200) {
+					try {
+						var data = JSON.parse(xhr.responseText);
+						var pts = data.points || [];
+						var sim = data.sim_code || '';
+						if (sentimentMeta) {
+							if (pts.length > 0) {
+								var t0 = pts[0].time;
+								var t1 = pts[pts.length-1].time;
+								sentimentMeta.innerText = 'Simulation: ' + sim + '，时间范围：' + t0 + ' —— ' + t1;
+							} else {
+								sentimentMeta.innerText = 'Simulation: ' + sim + '，暂无情感数据';
+							}
+						}
+						drawSentimentChart(pts);
+					} catch (e) {
+						if (sentimentMeta) sentimentMeta.innerText = '数据解析失败';
+					}
+				} else {
+					if (sentimentMeta) sentimentMeta.innerText = '请求失败：' + xhr.status;
+				}
+			}
+		};
+		xhr.send();
+	}
+
+	if (sentimentBtn && sentimentModal) {
+		sentimentBtn.onclick = function(){
+			sentimentModal.style.display = 'block';
+			if (sentimentMeta) sentimentMeta.innerText = '加载中...';
+			drawSentimentChart([]);
+			fetchSentimentTimeline();
+		};
+	}
+	if (sentimentClose && sentimentModal) {
+		sentimentClose.onclick = function(){
+			sentimentModal.style.display = 'none';
+		};
+	}
+	if (sentimentModal) {
+		sentimentModal.onclick = function(e){
+			if (e.target === sentimentModal) {
+				sentimentModal.style.display = 'none';
+			}
+		};
+	}
 </script>
 
 

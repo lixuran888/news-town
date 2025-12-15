@@ -61,7 +61,8 @@ def write_list_of_list_to_csv(curr_list_of_list, outfile):
     None
   """
   create_folder_if_not_there(outfile)
-  with open(outfile, "w") as f:
+  # 使用 UTF-8 编码写入，避免在 Windows 上因默认 GBK 导致中文报错
+  with open(outfile, "w", encoding="utf-8") as f:
     writer = csv.writer(f)
     writer.writerows(curr_list_of_list)
 
@@ -83,7 +84,7 @@ def write_list_to_csv_line(line_list, outfile):
   create_folder_if_not_there(outfile)
 
   # Opening the file first so we can write incrementally as we progress
-  curr_file = open(outfile, 'a',)
+  curr_file = open(outfile, 'a', encoding="utf-8")
   csvfile_1 = csv.writer(curr_file)
   csvfile_1.writerow(line_list)
   curr_file.close()
@@ -100,7 +101,8 @@ def read_file_to_list(curr_file, header=False, strip_trail=True):
   """
   if not header: 
     analysis_list = []
-    with open(curr_file) as f_analysis_file: 
+    # 使用 UTF-8 编码读取 CSV，避免中文导致的 GBK 解码错误
+    with open(curr_file, encoding="utf-8") as f_analysis_file: 
       data_reader = csv.reader(f_analysis_file, delimiter=",")
       for count, row in enumerate(data_reader): 
         if strip_trail: 
@@ -109,7 +111,7 @@ def read_file_to_list(curr_file, header=False, strip_trail=True):
     return analysis_list
   else: 
     analysis_list = []
-    with open(curr_file) as f_analysis_file: 
+    with open(curr_file, encoding="utf-8") as f_analysis_file: 
       data_reader = csv.reader(f_analysis_file, delimiter=",")
       for count, row in enumerate(data_reader): 
         if strip_trail: 
@@ -127,7 +129,7 @@ def read_file_to_set(curr_file, col=0):
     Set with all items in a single column of a csv file. 
   """
   analysis_set = set()
-  with open(curr_file) as f_analysis_file: 
+  with open(curr_file, encoding="utf-8") as f_analysis_file: 
     data_reader = csv.reader(f_analysis_file, delimiter=",")
     for count, row in enumerate(data_reader): 
       analysis_set.add(row[col])
@@ -145,7 +147,7 @@ def get_row_len(curr_file):
   """
   try: 
     analysis_set = set()
-    with open(curr_file) as f_analysis_file: 
+    with open(curr_file, encoding="utf-8") as f_analysis_file: 
       data_reader = csv.reader(f_analysis_file, delimiter=",")
       for count, row in enumerate(data_reader): 
         analysis_set.add(row[0])
@@ -164,7 +166,9 @@ def check_if_file_exists(curr_file):
     False if the file does not exist
   """
   try: 
-    with open(curr_file) as f_analysis_file: pass
+    # 仅用于判断文件是否存在，同样显式指定 UTF-8，保持行为一致
+    with open(curr_file, encoding="utf-8") as f_analysis_file: 
+      pass
     return True
   except: 
     return False

@@ -10,6 +10,8 @@ from os import listdir
 import os
 
 import datetime
+from datetime import datetime as dt
+from pathlib import Path
 from django.shortcuts import render, redirect, HttpResponseRedirect
 from django.http import HttpResponse, JsonResponse
 from global_methods import *
@@ -307,17 +309,106 @@ def path_tester_update(request):
   """
   data = json.loads(request.body)
   camera = data["camera"]
-
+  camera = data["camera"]
   with open(f"temp_storage/path_tester_env.json", "w") as outfile:
     outfile.write(json.dumps(camera, indent=2))
 
   return HttpResponse("received")
 
 
+def sentiment_timeline(request):
+  """返回最新 simulation 的情感时间序列（平均情感得分随时间）
 
+  输出格式：{
+    "sim_code": "auto_run_xxx",
+    "points": [
+      {"time": "2026-02-11T09:10:00", "avg_score": -0.3},
+      ...
+    ]
+  }
+  """
+  try:
+    # 1. 找到最新的 simulation 目录（storage 下以 auto_run 开头的文件夹）
+    storage = Path("storage")
+    sims = sorted(
+      [p for p in storage.iterdir() if p.is_dir() and p.name.startswith("auto_run")],
+      key=lambda p: p.stat().st_mtime,
+      reverse=True,
+    )
+    if not sims:
+      return JsonResponse({"error": "no_simulation"}, status=400)
 
+    sim_dir = sims[0]
+    sim_code = sim_dir.name
 
+    # 2. 遍历 personas 的 nodes.json，收集所有 chat 及其时间戳
+    from sentiment.sentiment_analysis import analyze_sentiment
 
+    time_buckets = {}  # { minute_str: [scores] }
 
+    personas_dir = sim_dir / "personas"
+    if not personas_dir.exists():
+      return JsonResponse({"error": "no_personas"}, status=400)
 
+    for persona_dir in sorted(personas_dir.iterdir()):
+      if not persona_dir.is_dir():
+        continue
 
+      nodes_path = persona_dir / "bootstrap_memory" / "associative_memory" / "nodes.json"
+      if not nodes_path.exists():
+        continue
+
+      try:
+        with open(nodes_path, encoding="utf-8") as f:
+          nodes = json.load(f)
+      except Exception:
+        continue
+
+      if not isinstance(nodes, dict) or not nodes:
+        continue
+
+      for node_id, node in nodes.items():
+        if node.get("type") != "chat":
+          continue
+
+        created_str = node.get("created", "")
+        filling = node.get("filling", []) or []
+
+        # 解析时间戳，按分钟聚合
+        try:
+          # 原始格式通常是 "%Y-%m-%d %H:%M:%S"
+          created_dt = dt.strptime(created_str, "%Y-%m-%d %H:%M:%S")
+        except Exception:
+          # 如果格式异常，则跳过时间聚合
+          created_dt = None
+
+        # 对每句发言做情感分析
+        for speaker, utt in filling:
+          try:
+            result = analyze_sentiment(utt)
+            score = float(result.get("score", 0.0))
+          except Exception:
+            score = 0.0
+
+          if created_dt is not None:
+            bucket_key = created_dt.replace(second=0).isoformat()
+            time_buckets.setdefault(bucket_key, []).append(score)
+
+    # 3. 计算每个时间桶的平均情感得分
+    points = []
+    for t_str, scores in time_buckets.items():
+      if not scores:
+        continue
+      avg_score = sum(scores) / float(len(scores))
+      points.append({"time": t_str, "avg_score": round(avg_score, 3)})
+
+    # 按时间排序
+    points.sort(key=lambda x: x["time"])
+
+    return JsonResponse({
+      "sim_code": sim_code,
+      "points": points,
+    })
+
+  except Exception as e:
+    return JsonResponse({"error": "internal_error", "detail": str(e)}, status=500)

@@ -14,7 +14,7 @@
 				<h2><span id="game-time-content"></span></h2> 
 			</div>
 			<div class="col-md-4">
-				
+				<!-- 控制仿真播放 -->
 				<h2 style="text-align: right; {% if mode == 'simulate' %} display: none {% endif %}">
 					<button id="play_button" type="button" class="btn btn-default">
 				    <strong style=" font-size:1.2em"><i class="glyphicon glyphicon-play"></i> &nbsp;Play</strong>
@@ -26,6 +26,15 @@
 
 				</h2>
 				
+			</div>
+		</div>
+
+		<!-- 舆论与情感走势按钮 -->
+		<div class="row" style="margin-top:1em;">
+			<div class="col-md-12" style="text-align:right;">
+				<button id="sentiment_timeline_btn" type="button" class="btn btn-info btn-sm">
+					<strong style="font-size:1.0em">舆论与情感走势</strong>
+				</button>
 			</div>
 		</div>
 
@@ -57,11 +66,20 @@
 			<br>
 		{% endfor %}
 
+	</div>
+</div>
 
-
-
-		
-
+<!-- 情感时间序列小弹窗 -->
+<div id="sentiment_modal" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.4);">
+	<div style="background:#ffffff; width:640px; max-width:95%; margin:5% auto; padding:1em 1.5em 1.5em 1.5em; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.3);">
+		<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5em;">
+			<h4 style="margin:0;">舆论与情感走势（平均情感得分）</h4>
+			<button id="sentiment_modal_close" type="button" class="btn btn-default btn-xs">关闭</button>
+		</div>
+		<small id="sentiment_meta" style="color:#666;"></small>
+		<div style="margin-top:0.5em;">
+			<canvas id="sentiment_canvas" width="600" height="280" style="max-width:100%; border:1px solid #ddd; border-radius:4px;"></canvas>
+		</div>
 	</div>
 </div>
 

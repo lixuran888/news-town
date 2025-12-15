@@ -360,7 +360,7 @@ class Scratch:
     scratch["act_path_set"] = self.act_path_set
     scratch["planned_path"] = self.planned_path
 
-    with open(out_json, "w") as outfile:
+    with open(out_json, "w", encoding='utf-8') as outfile:
       json.dump(scratch, outfile, indent=2) 
 
 

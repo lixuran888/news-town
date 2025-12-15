@@ -22,6 +22,12 @@ deepseek_api_key = "sk-1425a2c9096645888105644b7db582d9"
 DEEPSEEK_API_BASE = "https://api.deepseek.com/v1"
 DEEPSEEK_MODEL_NAME = "deepseek-chat"
 
+# OpenAI API 配置（用于 Embedding）
+# API2D Forward Key
+openai_api_key = "fk235815-DxWmUSJ64lY2SdlC13Eice8Gt1FhykW5"
+OPENAI_API_BASE = "https://oa.api2d.net/v1"
+OPENAI_EMBEDDING_MODEL = "text-embedding-3-small"
+
 # 先定义路径变量，以便在读取配置时使用
 maze_assets_loc = "../../../environment/frontend_server/static_dirs/assets"
 env_matrix = f"{maze_assets_loc}/the_ville/matrix"

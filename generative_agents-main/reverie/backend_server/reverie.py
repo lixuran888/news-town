@@ -92,7 +92,7 @@ class ReverieServer:
         pass
     os.makedirs(movement_folder, exist_ok=True)
 
-    with open(f"{sim_folder}/reverie/meta.json") as json_file:  
+    with open(f"{sim_folder}/reverie/meta.json", encoding='utf-8') as json_file:  
       reverie_meta = json.load(json_file)
 
     # 从独立的开始时间配置文件读取时间
@@ -124,7 +124,7 @@ class ReverieServer:
     # 注意：不再强制覆盖时间，使用用户在 landing 页面设置的时间
     # （时间已保存在 base_the_ville_clean/reverie/meta.json 的 curr_time 字段中）
 
-    with open(f"{sim_folder}/reverie/meta.json", "w") as outfile: 
+    with open(f"{sim_folder}/reverie/meta.json", "w", encoding='utf-8') as outfile: 
       outfile.write(json.dumps(reverie_meta, indent=2))
 
     # LOADING REVERIE'S GLOBAL VARIABLES
@@ -221,6 +221,8 @@ class ReverieServer:
         print(f"[Reverie] 正在加载 agent: {persona_name}...")
         print(f"[Reverie]   初始位置: ({p_x}, {p_y})")
         curr_persona = Persona(persona_name, persona_folder)
+        # 记录当前 simulation 路径，供刷手机模块使用
+        curr_persona.scratch.sim_folder = sim_folder
         print(f"[Reverie] ✅ {persona_name} 加载成功")
       except Exception as e:
         print(f"[Reverie] ❌ {persona_name} 加载失败: {e}")
@@ -323,12 +325,12 @@ class ReverieServer:
     # simulation. 
     curr_sim_code = dict()
     curr_sim_code["sim_code"] = self.sim_code
-    with open(f"{fs_temp_storage}/curr_sim_code.json", "w") as outfile: 
+    with open(f"{fs_temp_storage}/curr_sim_code.json", "w", encoding='utf-8') as outfile: 
       outfile.write(json.dumps(curr_sim_code, indent=2))
     
     curr_step = dict()
     curr_step["step"] = self.step
-    with open(f"{fs_temp_storage}/curr_step.json", "w") as outfile: 
+    with open(f"{fs_temp_storage}/curr_step.json", "w", encoding='utf-8') as outfile: 
       outfile.write(json.dumps(curr_step, indent=2))
 
     # 尝试在本机浏览器中自动打开前端页面，方便直接查看仿真结果。
@@ -370,7 +372,7 @@ class ReverieServer:
     reverie_meta["persona_names"] = list(self.personas.keys())
     reverie_meta["step"] = self.step
     reverie_meta_f = f"{sim_folder}/reverie/meta.json"
-    with open(reverie_meta_f, "w") as outfile: 
+    with open(reverie_meta_f, "w", encoding='utf-8') as outfile: 
       outfile.write(json.dumps(reverie_meta, indent=2))
 
     # Save the personas.
@@ -422,7 +424,7 @@ class ReverieServer:
         curr_dict = {}
         tester_file = fs_temp_storage + "/path_tester_env.json"
         if check_if_file_exists(tester_file): 
-          with open(tester_file) as json_file: 
+          with open(tester_file, encoding='utf-8') as json_file: 
             curr_dict = json.load(json_file)
             os.remove(tester_file)
           
@@ -458,7 +460,7 @@ class ReverieServer:
         # Incrementally outputting the s_mem and saving the json file. 
         print ("= " * 15)
         out_file = fs_temp_storage + "/path_tester_out.json"
-        with open(out_file, "w") as outfile: 
+        with open(out_file, "w", encoding='utf-8') as outfile: 
           outfile.write(json.dumps(s_mem, indent=2))
         print_tree(s_mem)
 
@@ -517,7 +519,7 @@ class ReverieServer:
         # input to our personas. So we first retrieve it.
         try: 
           # Try and save block for robustness of the while loop.
-          with open(curr_env_file) as json_file:
+          with open(curr_env_file, encoding='utf-8') as json_file:
             new_env = json.load(json_file)
             env_retrieved = True
         except Exception as e:
