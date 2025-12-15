@@ -232,7 +232,7 @@ class Persona:
       last_browse_hour = getattr(self.scratch, "_last_phone_browse_hour", -1)
       if last_browse_hour != current_hour:
         try:
-          browse_phone(self, maze)
+          browse_phone(self, maze, sim_folder=getattr(self.scratch, "sim_folder", None))
           self.scratch._last_phone_browse_hour = current_hour
         except Exception as e:
           print(f"[Phone] {self.scratch.name} 刷手机出错: {e}")

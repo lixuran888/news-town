@@ -435,6 +435,12 @@ def should_browse_phone(persona, current_hour):
         if keyword in curr_action:
             return True
     
+    # 若未匹配关键词，也根据人物预设的刷手机偏好小时强制触发
+    config = PHONE_USAGE_CONFIG.get(getattr(persona.scratch, "name", ""), {})
+    preferred_hours = config.get("preferred_hours", [])
+    if current_hour in preferred_hours:
+        return True
+    
     return False
 
 def get_phone_usage_description(name):
