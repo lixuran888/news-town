@@ -10,8 +10,11 @@
       <button id="play_button" type="button" class="btn btn-xs btn-default" style="margin-right: 5px;">
         <i class="glyphicon glyphicon-play"></i> Play
       </button>
-      <button id="pause_button" type="button" class="btn btn-xs btn-default">
+      <button id="pause_button" type="button" class="btn btn-xs btn-default" style="margin-right: 5px;">
         <i class="glyphicon glyphicon-pause"></i> Pause
+      </button>
+      <button id="opinion_chart_btn" type="button" class="btn btn-xs btn-primary" style="margin-right: 5px;">
+        <i class="glyphicon glyphicon-stats"></i> 舆论统计
       </button>
     </div>
   </div>
@@ -93,6 +96,56 @@
     </header>
     <div class="persona-detail-body" id="persona-detail-body">
       <div class="persona-detail-loading">加载中...</div>
+    </div>
+  </section>
+</div>
+
+<!-- 舆论统计图表弹窗 -->
+<div id="opinion-chart-overlay" class="persona-detail-overlay" style="display:none;">
+  <section class="persona-detail-board" style="max-width: 900px;">
+    <header class="persona-detail-header">
+      <div>
+        <span class="persona-detail-title">📊 舆论统计图表</span>
+        <span class="persona-detail-subtitle">数量统计（直方图）+ 情感统计（线型图）</span>
+      </div>
+      <div class="persona-detail-actions">
+        <button class="persona-detail-close" id="opinion-chart-close" aria-label="关闭弹窗">×</button>
+      </div>
+    </header>
+    <div class="persona-detail-body" id="opinion-chart-body" style="padding: 20px;">
+      <div id="opinion-chart-loading" style="text-align: center; padding: 40px;">
+        <p>正在加载舆论数据...</p>
+      </div>
+      <div id="opinion-chart-stats" style="margin-bottom: 20px; display: none;">
+        <div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 15px;">
+          <div style="text-align: center;">
+            <div style="font-size: 24px; font-weight: bold; color: #333;">{{ statistics.total_posts }}</div>
+            <div style="font-size: 12px; color: #666;">总帖子数</div>
+          </div>
+          <div style="text-align: center;">
+            <div style="font-size: 24px; font-weight: bold; color: #4CAF50;">{{ statistics.total_positive }}</div>
+            <div style="font-size: 12px; color: #666;">正面</div>
+          </div>
+          <div style="text-align: center;">
+            <div style="font-size: 24px; font-weight: bold; color: #f44336;">{{ statistics.total_negative }}</div>
+            <div style="font-size: 12px; color: #666;">负面</div>
+          </div>
+          <div style="text-align: center;">
+            <div style="font-size: 24px; font-weight: bold; color: #9E9E9E;">{{ statistics.total_neutral }}</div>
+            <div style="font-size: 12px; color: #666;">中性</div>
+          </div>
+          <div style="text-align: center;">
+            <div style="font-size: 24px; font-weight: bold; color: #2196F3;">{{ statistics.average_sentiment }}</div>
+            <div style="font-size: 12px; color: #666;">平均情感分</div>
+          </div>
+        </div>
+      </div>
+      <div id="opinion-chart-container" style="display: none;">
+        <canvas id="opinion-chart-canvas" style="max-height: 500px;"></canvas>
+      </div>
+      <div id="opinion-chart-error" style="display: none; text-align: center; padding: 40px; color: #f44336;">
+        <p>加载失败，请稍后重试</p>
+      </div>
     </div>
   </section>
 </div>
@@ -1826,6 +1879,243 @@ function renderPersonaDetail(container, data) {
 })();
 
 </script>
+
+// 舆论统计图表功能
+(function() {
+  const chartBtn = document.getElementById('opinion_chart_btn');
+  const chartOverlay = document.getElementById('opinion-chart-overlay');
+  const chartCloseBtn = document.getElementById('opinion-chart-close');
+  const chartLoading = document.getElementById('opinion-chart-loading');
+  const chartContainer = document.getElementById('opinion-chart-container');
+  const chartError = document.getElementById('opinion-chart-error');
+  const chartStats = document.getElementById('opinion-chart-stats');
+  let opinionChart = null;
+  
+  if (!chartBtn || !chartOverlay) return;
+  
+  // 打开弹窗
+  chartBtn.addEventListener('click', function() {
+    chartOverlay.style.display = 'flex';
+    loadOpinionChart();
+  });
+  
+  // 关闭弹窗
+  if (chartCloseBtn) {
+    chartCloseBtn.addEventListener('click', function() {
+      chartOverlay.style.display = 'none';
+      if (opinionChart) {
+        opinionChart.destroy();
+        opinionChart = null;
+      }
+    });
+  }
+  
+  chartOverlay.addEventListener('click', function(e) {
+    if (e.target === chartOverlay) {
+      chartOverlay.style.display = 'none';
+      if (opinionChart) {
+        opinionChart.destroy();
+        opinionChart = null;
+      }
+    }
+  });
+  
+  function loadOpinionChart() {
+    // 显示加载状态
+    chartLoading.style.display = 'block';
+    chartContainer.style.display = 'none';
+    chartError.style.display = 'none';
+    chartStats.style.display = 'none';
+    
+    // 获取sim_code
+    const simCode = '{{ sim_code|default:"" }}';
+    const url = '/opinion_statistics_chart/?sim_code=' + encodeURIComponent(simCode);
+    
+    fetch(url)
+      .then(function(response) {
+        return response.json();
+      })
+      .then(function(data) {
+        chartLoading.style.display = 'none';
+        
+        if (!data.success || !data.chart_data) {
+          chartError.style.display = 'block';
+          chartError.innerHTML = '<p>' + (data.message || '加载失败，请稍后重试') + '</p>';
+          return;
+        }
+        
+        // 显示统计信息
+        if (data.statistics) {
+          const stats = data.statistics;
+          chartStats.innerHTML = 
+            '<div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 15px;">' +
+              '<div style="text-align: center;">' +
+                '<div style="font-size: 24px; font-weight: bold; color: #333;">' + (stats.total_posts || 0) + '</div>' +
+                '<div style="font-size: 12px; color: #666;">总帖子数</div>' +
+              '</div>' +
+              '<div style="text-align: center;">' +
+                '<div style="font-size: 24px; font-weight: bold; color: #4CAF50;">' + (stats.total_positive || 0) + '</div>' +
+                '<div style="font-size: 12px; color: #666;">正面</div>' +
+              '</div>' +
+              '<div style="text-align: center;">' +
+                '<div style="font-size: 24px; font-weight: bold; color: #f44336;">' + (stats.total_negative || 0) + '</div>' +
+                '<div style="font-size: 12px; color: #666;">负面</div>' +
+              '</div>' +
+              '<div style="text-align: center;">' +
+                '<div style="font-size: 24px; font-weight: bold; color: #9E9E9E;">' + (stats.total_neutral || 0) + '</div>' +
+                '<div style="font-size: 12px; color: #666;">中性</div>' +
+              '</div>' +
+              '<div style="text-align: center;">' +
+                '<div style="font-size: 24px; font-weight: bold; color: #2196F3;">' + (stats.average_sentiment || 0) + '</div>' +
+                '<div style="font-size: 12px; color: #666;">平均情感分</div>' +
+              '</div>' +
+            '</div>';
+          chartStats.style.display = 'block';
+        }
+        
+        // 绘制图表
+        const chartData = data.chart_data;
+        if (chartData.dates && chartData.dates.length > 0) {
+          drawChart(chartData);
+          chartContainer.style.display = 'block';
+        } else {
+          chartError.style.display = 'block';
+          chartError.innerHTML = '<p>暂无数据</p>';
+        }
+      })
+      .catch(function(error) {
+        console.error('加载舆论统计失败:', error);
+        chartLoading.style.display = 'none';
+        chartError.style.display = 'block';
+        chartError.innerHTML = '<p>加载失败：' + error.message + '</p>';
+      });
+  }
+  
+  function drawChart(chartData) {
+    const ctx = document.getElementById('opinion-chart-canvas');
+    if (!ctx) return;
+    
+    const canvasCtx = ctx.getContext('2d');
+    
+    // 销毁旧图表
+    if (opinionChart) {
+      opinionChart.destroy();
+    }
+    
+    // 检查Chart是否可用
+    if (typeof Chart === 'undefined') {
+      chartError.style.display = 'block';
+      chartError.innerHTML = '<p>Chart.js库未加载，请刷新页面重试</p>';
+      return;
+    }
+    
+    // 创建组合图表：柱状图（数量）+ 折线图（情感分数）
+    opinionChart = new Chart(canvasCtx, {
+      type: 'bar',
+      data: {
+        labels: chartData.dates,
+        datasets: [
+          {
+            label: '总帖子数',
+            data: chartData.counts.total,
+            backgroundColor: 'rgba(33, 150, 243, 0.6)',
+            borderColor: 'rgba(33, 150, 243, 1)',
+            borderWidth: 1,
+            yAxisID: 'y'
+          },
+          {
+            label: '正面',
+            data: chartData.counts.positive,
+            backgroundColor: 'rgba(76, 175, 80, 0.6)',
+            borderColor: 'rgba(76, 175, 80, 1)',
+            borderWidth: 1,
+            yAxisID: 'y'
+          },
+          {
+            label: '负面',
+            data: chartData.counts.negative,
+            backgroundColor: 'rgba(244, 67, 54, 0.6)',
+            borderColor: 'rgba(244, 67, 54, 1)',
+            borderWidth: 1,
+            yAxisID: 'y'
+          },
+          {
+            label: '中性',
+            data: chartData.counts.neutral,
+            backgroundColor: 'rgba(158, 158, 158, 0.6)',
+            borderColor: 'rgba(158, 158, 158, 1)',
+            borderWidth: 1,
+            yAxisID: 'y'
+          },
+          {
+            label: '平均情感分数',
+            data: chartData.sentiment_scores,
+            type: 'line',
+            borderColor: 'rgba(255, 152, 0, 1)',
+            backgroundColor: 'rgba(255, 152, 0, 0.1)',
+            borderWidth: 2,
+            fill: false,
+            tension: 0.4,
+            yAxisID: 'y1',
+            pointRadius: 4,
+            pointHoverRadius: 6
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        aspectRatio: 2,
+        plugins: {
+          title: {
+            display: true,
+            text: '舆论数量统计（直方图）+ 情感趋势（线型图）',
+            font: { size: 16 }
+          },
+          legend: {
+            display: true,
+            position: 'top'
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false
+          }
+        },
+        scales: {
+          y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            title: {
+              display: true,
+              text: '帖子数量'
+            },
+            beginAtZero: true
+          },
+          y1: {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            title: {
+              display: true,
+              text: '情感分数'
+            },
+            beginAtZero: false,
+            grid: {
+              drawOnChartArea: false
+            }
+          },
+          x: {
+            title: {
+              display: true,
+              text: '日期'
+            }
+          }
+        }
+      }
+    });
+  }
+})();
 
 {% endblock js_content %}
 

@@ -1,0 +1,23 @@
+{
+  "fork_sim_code": "base_the_ville_clean",
+  "start_date": "February 11, 2026",
+  "curr_time": "February 11, 2026, 22:11:00",
+  "sec_per_step": 10,
+  "maze_name": "the_ville",
+  "persona_names": [
+    "Wang Lihua",
+    "Gao Jianguo",
+    "Lin Xiaoyu",
+    "Li Daqiang",
+    "Chen Siyuan",
+    "Zhou Xiaoyi",
+    "Han Xiaoxue",
+    "Zhang Guoqing",
+    "Liu Xiaomin",
+    "Public Health Expert",
+    "Market Supervision Expert",
+    "Education Bureau Representative",
+    "Meeting Moderator"
+  ],
+  "step": 0
+}

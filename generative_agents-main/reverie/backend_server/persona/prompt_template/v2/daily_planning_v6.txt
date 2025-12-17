@@ -6,11 +6,28 @@ Variables:
 !<INPUT 2>! -- Reverie date time now
 !<INPUT 3>! -- Persona first names
 !<INPUT 4>! -- wake_up_hour
+!<INPUT 5>! -- daily_plan_req (important daily requirements including phone browsing times)
+!<INPUT 6>! -- phone_usage_hint (light/medium/heavy with minimum sessions)
 
 <commentblockmarker>###</commentblockmarker>
 !<INPUT 0>!
 
 In general, !<INPUT 1>!
+
+!<INPUT 5>!
+
+PHONE USAGE RULES (must be reflected in today's plan):
+- !<INPUT 6>!
+- Everyone MUST have phone/刷手机 activities. Never skip.
+- Heavy: 3-4 sessions, total >=150 min,分布在早/午/晚至少各一次，可包含刷新闻/社交媒体/聊天。
+- Medium: 2 sessions, 每次15-30 min，至少晚间有一次。
+- Light: 1 session，<=15 min，最好安排在睡前或晚间，总时长<=30 min。
+- 手机时间可以与咖啡馆/公园/通勤等场景结合，但必须明确是“看手机/刷社交媒体/看新闻/回复消息”。
+- **Phone-Post pairing**: 每次刷手机之后，必须“紧跟着”一个“在线发言/评论/回复消息/发布帖子”的活动，中间不能插入吃饭/走路/工作等其它任务；可以直接描述为 “刷手机并立即在线发言/评论”。
+- 示例（可参考重/中/轻）：  
+  - Heavy段：早上“刷手机+发言(15-30min)”，下午“刷手机+发言(30-60min)”，晚间“刷手机+发言(60-90min)”，总时长>=150min。  
+  - Medium段：下午“刷手机+发言(15-30min)”，晚间“刷手机+发言(20-30min)”。  
+  - Light段：晚间“刷手机+简短回复(<=15min)”，总时长<=30min。
 
 IMPORTANT: This is a PUBLIC OPINION SIMULATION TOWN. Social interaction and conversation are the TOP PRIORITY.
 - Talking with friends and neighbors is MORE IMPORTANT than solitary activities like studying or working alone.

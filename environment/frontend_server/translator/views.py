@@ -693,6 +693,95 @@ def get_online_posts(request):
     })
 
 
+def sentiment_timeline(request):
+  """按日期汇总线上舆论的情感趋势（便于前端绘制时间序列）"""
+  sim_code = request.GET.get("sim_code", "")
+  paths_to_try = []
+
+  if sim_code:
+    paths_to_try.append(f"storage/{sim_code}/online_opinions/posts.json")
+  paths_to_try.append("storage/base_the_ville_clean/online_opinions/posts.json")
+
+  posts_data = None
+  source_path = None
+  for path in paths_to_try:
+    if os.path.exists(path):
+      with open(path, 'r', encoding='utf-8') as f:
+        posts_data = json.load(f)
+      source_path = path
+      break
+
+  if posts_data is None:
+    return JsonResponse({
+      "enabled": SENTIMENT_ENABLED,
+      "timeline": [],
+      "message": "舆论库尚未创建"
+    })
+
+  buckets = {}
+  for post in posts_data.get("posts", []):
+    ts = post.get("timestamp")
+    content = post.get("content", "")
+
+    # 解析日期（忽略无效时间戳）
+    try:
+      dt = datetime.datetime.strptime(ts, "%Y-%m-%d %H:%M:%S") if ts else None
+    except Exception:
+      dt = None
+
+    if not dt:
+      continue
+
+    date_key = dt.strftime("%Y-%m-%d")
+    bucket = buckets.setdefault(date_key, {
+      "date": date_key,
+      "total": 0,
+      "positive": 0,
+      "negative": 0,
+      "neutral": 0,
+      "scores": []
+    })
+
+    if SENTIMENT_ENABLED:
+      result = analyze_sentiment(content)
+      label = result.get("label", "neutral")
+      score = result.get("score", 0.0)
+    else:
+      label = "neutral"
+      score = 0.0
+
+    bucket["total"] += 1
+    if label == "positive":
+      bucket["positive"] += 1
+    elif label == "negative":
+      bucket["negative"] += 1
+    else:
+      bucket["neutral"] += 1
+
+    bucket["scores"].append(score)
+
+  # 构建排序后的时间序列
+  timeline = []
+  for date_key in sorted(buckets.keys()):
+    bucket = buckets[date_key]
+    avg_score = round(sum(bucket["scores"]) / len(bucket["scores"]), 3) if bucket["scores"] else 0.0
+    timeline.append({
+      "date": date_key,
+      "total": bucket["total"],
+      "positive": bucket["positive"],
+      "negative": bucket["negative"],
+      "neutral": bucket["neutral"],
+      "average_score": avg_score
+    })
+
+  return JsonResponse({
+    "enabled": SENTIMENT_ENABLED,
+    "timeline": timeline,
+    "source": source_path,
+    "total_posts": len(posts_data.get("posts", []))
+  })
+
+
 @csrf_exempt
 def post_online_opinion(request):
   """发表线上舆论（测试用）"""
@@ -878,5 +967,140 @@ def check_start_time_configured(request):
     return JsonResponse({
       "configured": False,
       "message": "开始时间未配置"
+    })
+
+
+def opinion_statistics_chart(request):
+  """
+  收集全部舆论并生成统计图表数据
+  返回：数量统计（直方图）+ 情感统计（线型图）
+  """
+  try:
+    sim_code = request.GET.get("sim_code", "")
+    paths_to_try = []
+    
+    if sim_code:
+      paths_to_try.append(f"storage/{sim_code}/online_opinions/posts.json")
+    paths_to_try.append("storage/base_the_ville_clean/online_opinions/posts.json")
+    
+    posts_data = None
+    for path in paths_to_try:
+      if os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
+          posts_data = json.load(f)
+        break
+    
+    if posts_data is None:
+      return JsonResponse({
+        "enabled": SENTIMENT_ENABLED,
+        "message": "舆论库尚未创建",
+        "chart_data": {
+          "dates": [],
+          "counts": {"total": [], "positive": [], "negative": [], "neutral": []},
+          "sentiment_scores": []
+        }
+      })
+    
+    posts = posts_data.get("posts", [])
+    
+    # 按日期分组统计
+    date_buckets = {}
+    for post in posts:
+      ts = post.get("timestamp", "")
+      content = post.get("content", "")
+      
+      try:
+        dt = datetime.datetime.strptime(ts, "%Y-%m-%d %H:%M:%S") if ts else None
+      except Exception:
+        dt = None
+      
+      if not dt:
+        continue
+      
+      date_key = dt.strftime("%Y-%m-%d")
+      bucket = date_buckets.setdefault(date_key, {
+        "date": date_key,
+        "total": 0,
+        "positive": 0,
+        "negative": 0,
+        "neutral": 0,
+        "scores": []
+      })
+      
+      # 情感分析
+      if SENTIMENT_ENABLED:
+        result = analyze_sentiment(content)
+        label = result.get("label", "neutral")
+        score = result.get("score", 0.0)
+      else:
+        label = "neutral"
+        score = 0.0
+      
+      bucket["total"] += 1
+      if label == "positive":
+        bucket["positive"] += 1
+      elif label == "negative":
+        bucket["negative"] += 1
+      else:
+        bucket["neutral"] += 1
+      
+      bucket["scores"].append(score)
+    
+    # 构建图表数据（按日期排序）
+    sorted_dates = sorted(date_buckets.keys())
+    chart_data = {
+      "dates": sorted_dates,
+      "counts": {
+        "total": [],
+        "positive": [],
+        "negative": [],
+        "neutral": []
+      },
+      "sentiment_scores": []
+    }
+    
+    for date_key in sorted_dates:
+      bucket = date_buckets[date_key]
+      chart_data["counts"]["total"].append(bucket["total"])
+      chart_data["counts"]["positive"].append(bucket["positive"])
+      chart_data["counts"]["negative"].append(bucket["negative"])
+      chart_data["counts"]["neutral"].append(bucket["neutral"])
+      
+      # 计算平均情感分数
+      avg_score = round(sum(bucket["scores"]) / len(bucket["scores"]), 3) if bucket["scores"] else 0.0
+      chart_data["sentiment_scores"].append(avg_score)
+    
+    # 总体统计
+    total_stats = {
+      "total_posts": len(posts),
+      "total_positive": sum(bucket["positive"] for bucket in date_buckets.values()),
+      "total_negative": sum(bucket["negative"] for bucket in date_buckets.values()),
+      "total_neutral": sum(bucket["neutral"] for bucket in date_buckets.values()),
+      "average_sentiment": round(
+        sum(chart_data["sentiment_scores"]) / len(chart_data["sentiment_scores"]) 
+        if chart_data["sentiment_scores"] else 0.0, 
+        3
+      )
+    }
+    
+    return JsonResponse({
+      "enabled": SENTIMENT_ENABLED,
+      "chart_data": chart_data,
+      "statistics": total_stats,
+      "success": True
+    })
+    
+  except Exception as e:
+    import traceback
+    print(f"[opinion_statistics_chart] Error: {traceback.format_exc()}")
+    return JsonResponse({
+      "enabled": False,
+      "error": str(e),
+      "chart_data": {
+        "dates": [],
+        "counts": {"total": [], "positive": [], "negative": [], "neutral": []},
+        "sentiment_scores": []
+      },
+      "success": False
     })
 

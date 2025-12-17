@@ -1,0 +1,67 @@
+{
+  "Wang Lihua": {
+    "maze": "the_ville",
+    "x": 72,
+    "y": 14
+  },
+  "Gao Jianguo": {
+    "maze": "the_ville",
+    "x": 126,
+    "y": 46
+  },
+  "Lin Xiaoyu": {
+    "maze": "the_ville",
+    "x": 123,
+    "y": 57
+  },
+  "Li Daqiang": {
+    "maze": "the_ville",
+    "x": 36,
+    "y": 18
+  },
+  "Chen Siyuan": {
+    "maze": "the_ville",
+    "x": 20,
+    "y": 65
+  },
+  "Zhou Xiaoyi": {
+    "maze": "the_ville",
+    "x": 53,
+    "y": 14
+  },
+  "Zhang Guoqing": {
+    "maze": "the_ville",
+    "x": 118,
+    "y": 61
+  },
+  "Liu Xiaomin": {
+    "maze": "the_ville",
+    "x": 94,
+    "y": 18
+  },
+  "Han Xiaoxue": {
+    "maze": "the_ville",
+    "x": 57,
+    "y": 74
+  },
+  "Public Health Expert": {
+    "maze": "the_ville",
+    "x": 123,
+    "y": 57
+  },
+  "Market Supervision Expert": {
+    "maze": "the_ville",
+    "x": 93,
+    "y": 49
+  },
+  "Education Bureau Representative": {
+    "maze": "the_ville",
+    "x": 118,
+    "y": 61
+  },
+  "Meeting Moderator": {
+    "maze": "the_ville",
+    "x": 128,
+    "y": 46
+  }
+}

@@ -41,5 +41,7 @@ urlpatterns = [
     url(r'^post_online_opinion/$', translator_views.post_online_opinion, name='post_online_opinion'),
     # 舆论与情感时间序列
     url(r'^sentiment_timeline/$', translator_views.sentiment_timeline, name='sentiment_timeline'),
+    # 舆论统计图表（数量+情感）
+    url(r'^opinion_statistics_chart/$', translator_views.opinion_statistics_chart, name='opinion_statistics_chart'),
     path('admin/', admin.site.urls),
 ]

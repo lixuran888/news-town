@@ -212,6 +212,41 @@ def run_gpt_prompt_daily_plan(persona,
     prompt_input += [persona.scratch.get_str_curr_date_str()]
     prompt_input += [persona.scratch.get_str_firstname()]
     prompt_input += [f"{str(wake_up_hour)}:00 am"]
+    # 添加daily_plan_req（包含"刷手机"等要求），确保LLM生成日程时参考这些要求
+    daily_plan_req = getattr(persona.scratch, "daily_plan_req", None)
+    if daily_plan_req:
+      prompt_input += [f"IMPORTANT: {daily_plan_req}"]
+    else:
+      prompt_input += [""]  # 如果没有daily_plan_req，添加空字符串以保持输入数量一致
+
+    # 按角色分层控制刷手机频次，供模板参考
+    name = getattr(persona.scratch, "name", persona.name)
+    heavy_users = {
+      "Gao Jianguo": "heavy",
+      "Chen Siyuan": "heavy",
+      "Zhang Guoqing": "heavy",
+    }
+    medium_users = {
+      "Wang Lihua": "medium",
+      "Lin Xiaoyu": "medium",
+      "Li Daqiang": "medium",
+      "Han Xiaoxue": "medium",
+    }
+    light_users = {
+      "Zhou Xiaoyi": "light",
+      "Liu Xiaomin": "light",
+    }
+
+    if name in heavy_users:
+      phone_hint = "Phone usage: HEAVY (3-4 sessions, >=150 min total; include morning/afternoon/evening)"
+    elif name in medium_users:
+      phone_hint = "Phone usage: MEDIUM (2 sessions, 15-30 min each; at least one evening check)"
+    elif name in light_users:
+      phone_hint = "Phone usage: LIGHT (1 short session <=15 min, preferably evening; no more than 30 min total)"
+    else:
+      phone_hint = "Phone usage: MEDIUM (2 sessions, 15-30 min each; at least one evening check)"
+
+    prompt_input += [phone_hint]
     return prompt_input
 
   def __func_clean_up(gpt_response, prompt=""):

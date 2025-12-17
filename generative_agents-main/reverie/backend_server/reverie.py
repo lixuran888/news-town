@@ -232,14 +232,16 @@ class ReverieServer:
         continue
 
       # 每次 fork 新世界时，只继承身份和长期记忆，
-      # 但当天状态 / 日程不应沿用旧世界，否则会出现“整天睡觉”的计划。
+      # 但当天状态 / 日程不应沿用旧世界，否则会出现"整天睡觉"的计划。
       # 因此这里显式重置与"今天"相关的 scratch 状态，让新世界从当前
       # Reverie 的 curr_time 作为一个全新的 "First day" 重新规划日程。
       s = curr_persona.scratch
       s.curr_time = None
       
-      # 所有agent（包括专家）都清空daily_plan_req，由LLM重新生成日程
-      s.daily_plan_req = None
+      # 保留从bootstrap_memory加载的原始daily_plan_req（包含"刷手机"等要求），
+      # 这样LLM生成日程时可以参考这些要求，确保包含刷手机等活动
+      # 注意：daily_plan_req在Persona初始化时已从bootstrap_memory/scratch.json加载
+      # 这里不清空它，让LLM在生成日程时可以参考原始要求
       
       s.daily_req = []
       s.f_daily_schedule = []
