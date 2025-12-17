@@ -46,7 +46,7 @@ verify_changes.py
 check_8am.py
 check_schedule_overlap.py
 
-# Ignore all simulation storage outputs except the clean base template
+# Ignore all simulation storage outputs except clean base template
 environment/frontend_server/storage/*
 !environment/frontend_server/storage/base_the_ville_clean/
 !environment/frontend_server/storage/base_the_ville_clean/**
