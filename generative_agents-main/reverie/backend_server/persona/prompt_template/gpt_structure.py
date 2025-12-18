@@ -404,6 +404,16 @@ def safe_generate_response(prompt,
 
 
 def get_embedding(text, model="text-embedding-3-small"):
+  """
+  获取文本的向量表示
+  
+  Args:
+    text: 要转换为向量的文本
+    model: 模型名称（默认不使用，由配置决定）
+  
+  Returns:
+    list: 向量列表（1536维），如果API失败则返回占位符向量
+  """
   text = text.replace("\n", " ")
   if not text: 
     text = "this is blank"
@@ -425,22 +435,39 @@ def get_embedding(text, model="text-embedding-3-small"):
       model=OPENAI_EMBEDDING_MODEL
     )
     
-    embedding = response['data'][0]['embedding']
+    # 安全地提取向量
+    if response and 'data' in response and len(response['data']) > 0:
+      embedding = response['data'][0].get('embedding', None)
+      if embedding and isinstance(embedding, list) and len(embedding) > 0:
+        # 恢复原来的 API 配置
+        openai.api_base = original_api_base
+        openai.api_key = original_api_key
+        return embedding
     
-    # 恢复原来的 API 配置
-    openai.api_base = original_api_base
-    openai.api_key = original_api_key
-    
-    return embedding
+    # 如果响应格式不正确，抛出异常进入except块
+    raise ValueError("Invalid response format from embedding API")
     
   except Exception as e:
     # 恢复原来的 API 配置
     openai.api_base = original_api_base
     openai.api_key = original_api_key
     
-    print(f"[Embedding] ❌ 失败: {e}")
-    print(f"[Embedding] 请检查 API2D 余额或网络连接")
-    return [0.0] * 1536  # 返回默认向量
+    # 详细错误信息
+    error_msg = str(e)
+    if hasattr(e, 'response') and hasattr(e.response, 'text'):
+      try:
+        error_data = json.loads(e.response.text)
+        error_msg = error_data.get('message', error_msg)
+      except:
+        pass
+    
+    print(f"[Embedding] ❌ 失败: {error_msg}")
+    print(f"[Embedding] ⚠️ 使用占位符向量（系统将继续运行，但语义检索功能可能受影响）")
+    
+    # 返回占位符向量（1536维，与 text-embedding-3-small 一致）
+    # 使用占位符确保系统可以继续运行，只是语义检索功能会受影响
+    placeholder = [0.0] * 1536
+    return placeholder
 
 
 if __name__ == '__main__':

@@ -230,16 +230,27 @@ def run_reflect(persona):
 
     thoughts = generate_insights_and_evidence(persona, nodes, 5)
     for thought, evidence in thoughts.items(): 
-      created = persona.scratch.curr_time
-      expiration = persona.scratch.curr_time + datetime.timedelta(days=30)
-      s, p, o = generate_action_event_triple(thought, persona)
-      keywords = set([s, p, o])
-      thought_poignancy = generate_poig_score(persona, "thought", thought)
-      thought_embedding_pair = (thought, get_embedding(thought))
+        created = persona.scratch.curr_time
+        expiration = persona.scratch.curr_time + datetime.timedelta(days=30)
+        s, p, o = generate_action_event_triple(thought, persona)
+        keywords = set([s, p, o])
+        thought_poignancy = generate_poig_score(persona, "thought", thought)
+        
+        # get_embedding 函数内部已有异常处理，失败时返回占位符向量
+        try:
+          thought_embedding = get_embedding(thought)
+          # 确保返回的是有效向量
+          if not thought_embedding or not isinstance(thought_embedding, list):
+            thought_embedding = [0.0] * 1536
+        except Exception as e:
+          print(f"[Reflect] ⚠️ Thought Embedding 失败: {e}，使用占位符")
+          thought_embedding = [0.0] * 1536
+        
+        thought_embedding_pair = (thought, thought_embedding)
 
-      persona.a_mem.add_thought(created, expiration, s, p, o, 
-                                thought, keywords, thought_poignancy, 
-                                thought_embedding_pair, evidence)
+        persona.a_mem.add_thought(created, expiration, s, p, o, 
+                                  thought, keywords, thought_poignancy, 
+                                  thought_embedding_pair, evidence)
 
 
 def reflection_trigger(persona): 

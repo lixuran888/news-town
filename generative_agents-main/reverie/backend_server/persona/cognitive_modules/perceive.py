@@ -141,7 +141,15 @@ def perceive(persona, maze):
       if desc_embedding_in in persona.a_mem.embeddings: 
         event_embedding = persona.a_mem.embeddings[desc_embedding_in]
       else: 
-        event_embedding = get_embedding(desc_embedding_in)
+        # get_embedding 函数内部已有异常处理，失败时返回占位符向量
+        try:
+          event_embedding = get_embedding(desc_embedding_in)
+          # 确保返回的是有效向量
+          if not event_embedding or not isinstance(event_embedding, list):
+            event_embedding = [0.0] * 1536
+        except Exception as e:
+          print(f"[Perceive] ⚠️ Embedding 失败: {e}，使用占位符")
+          event_embedding = [0.0] * 1536
       event_embedding_pair = (desc_embedding_in, event_embedding)
       
       # Get event poignancy. 
@@ -158,8 +166,15 @@ def perceive(persona, maze):
           chat_embedding = persona.a_mem.embeddings[
                              persona.scratch.act_description]
         else: 
-          chat_embedding = get_embedding(persona.scratch
-                                                .act_description)
+          # get_embedding 函数内部已有异常处理，失败时返回占位符向量
+          try:
+            chat_embedding = get_embedding(persona.scratch.act_description)
+            # 确保返回的是有效向量
+            if not chat_embedding or not isinstance(chat_embedding, list):
+              chat_embedding = [0.0] * 1536
+          except Exception as e:
+            print(f"[Perceive] ⚠️ Chat Embedding 失败: {e}，使用占位符")
+            chat_embedding = [0.0] * 1536
         chat_embedding_pair = (persona.scratch.act_description, 
                                chat_embedding)
         chat_poignancy = generate_poig_score(persona, "chat", 

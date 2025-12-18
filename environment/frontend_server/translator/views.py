@@ -992,12 +992,20 @@ def opinion_statistics_chart(request):
     
     if posts_data is None:
       return JsonResponse({
+        "success": True,
         "enabled": SENTIMENT_ENABLED,
         "message": "舆论库尚未创建",
         "chart_data": {
           "dates": [],
           "counts": {"total": [], "positive": [], "negative": [], "neutral": []},
           "sentiment_scores": []
+        },
+        "statistics": {
+          "total_posts": 0,
+          "total_positive": 0,
+          "total_negative": 0,
+          "total_neutral": 0,
+          "average_sentiment": 0.0
         }
       })
     
@@ -1094,13 +1102,21 @@ def opinion_statistics_chart(request):
     import traceback
     print(f"[opinion_statistics_chart] Error: {traceback.format_exc()}")
     return JsonResponse({
+      "success": False,
       "enabled": False,
       "error": str(e),
+      "message": "加载数据时发生错误: " + str(e),
       "chart_data": {
         "dates": [],
         "counts": {"total": [], "positive": [], "negative": [], "neutral": []},
         "sentiment_scores": []
       },
-      "success": False
+      "statistics": {
+        "total_posts": 0,
+        "total_positive": 0,
+        "total_negative": 0,
+        "total_neutral": 0,
+        "average_sentiment": 0.0
+      }
     })
 

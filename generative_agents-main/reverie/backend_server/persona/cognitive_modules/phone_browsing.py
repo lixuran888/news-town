@@ -61,11 +61,14 @@ def load_online_opinions(sim_folder=None):
     if os.path.exists(path):
         try:
             with open(path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except:
-            pass
+                data = json.load(f)
+                print(f"[Phone] 📖 从 {path} 读取到 {len(data.get('posts', []))} 条帖子")
+                return data
+        except Exception as e:
+            print(f"[Phone] ⚠️ 读取 {path} 失败: {e}，使用空数据")
     
     # 返回默认结构
+    print(f"[Phone] 📝 创建新的舆论库: {path}")
     return {
         "posts": [],
         "metadata": {
@@ -77,13 +80,22 @@ def load_online_opinions(sim_folder=None):
 
 def save_online_opinions(data, sim_folder=None):
     """保存线上舆论库"""
-    path = get_online_opinions_path(sim_folder)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    
-    data["metadata"]["total_posts"] = len(data["posts"])
-    
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    try:
+        path = get_online_opinions_path(sim_folder)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        
+        data["metadata"]["total_posts"] = len(data["posts"])
+        
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        
+        print(f"[Phone] ✅ 成功写入帖子到: {path} (共 {len(data['posts'])} 条)")
+    except Exception as e:
+        print(f"[Phone] ❌ 写入帖子失败: {e}")
+        print(f"[Phone] 路径: {get_online_opinions_path(sim_folder)}")
+        import traceback
+        traceback.print_exc()
+        raise  # 重新抛出异常，让调用者知道写入失败
 
 def read_recent_posts(limit=15, sim_folder=None):
     """
@@ -135,11 +147,15 @@ def post_online_opinion(persona, content, sim_folder=None):
     Args:
         persona: Persona实例
         content: 发言内容
-        sim_folder: simulation文件夹路径
+        sim_folder: simulation文件夹路径（如果为None，则从persona.scratch.sim_folder获取）
     
     Returns:
         dict: 新创建的帖子
     """
+    # 如果未提供sim_folder，尝试从persona.scratch获取
+    if sim_folder is None:
+        sim_folder = getattr(persona.scratch, "sim_folder", None)
+    
     data = load_online_opinions(sim_folder)
     
     # 获取网名和真名
@@ -163,9 +179,15 @@ def post_online_opinion(persona, content, sim_folder=None):
     }
     
     data["posts"].append(new_post)
-    save_online_opinions(data, sim_folder)
     
-    print(f"[Phone] {online_name} 发帖: {content[:50]}...")
+    try:
+        save_online_opinions(data, sim_folder)
+        print(f"[Phone] ✅ {online_name} 发帖成功: {content[:50]}...")
+    except Exception as e:
+        print(f"[Phone] ❌ {online_name} 发帖失败: {e}")
+        # 即使写入失败，也返回帖子对象，但调用者应该知道写入失败了
+        import traceback
+        traceback.print_exc()
     
     return new_post
 
@@ -261,7 +283,7 @@ def browse_phone(persona, maze=None, sim_folder=None):
     Args:
         persona: Persona实例
         maze: Maze实例（可选）
-        sim_folder: simulation文件夹路径
+        sim_folder: simulation文件夹路径（如果为None，则从persona.scratch.sim_folder获取）
     
     Returns:
         bool: 是否成功执行
@@ -269,6 +291,14 @@ def browse_phone(persona, maze=None, sim_folder=None):
     name = persona.scratch.name
     online_name = getattr(persona.scratch, "online_name", name)
     curr_time = persona.scratch.curr_time or datetime.datetime.now()
+    
+    # 如果未提供sim_folder，尝试从persona.scratch获取
+    if sim_folder is None:
+        sim_folder = getattr(persona.scratch, "sim_folder", None)
+        if sim_folder:
+            print(f"[Phone] 使用 sim_folder: {sim_folder}")
+        else:
+            print(f"[Phone] ⚠️ 未找到 sim_folder，将使用默认路径")
     
     print(f"\n[Phone] === {name} 开始刷手机 ===")
     
@@ -296,7 +326,15 @@ def browse_phone(persona, maze=None, sim_folder=None):
             keywords = {"phone", "online", "social_media", "food_poisoning"}
             poignancy = 5
             
-            thought_embedding_pair = (memory_content, get_embedding(memory_content))
+            # 尝试获取 embedding，如果失败则使用占位符
+            # get_embedding 函数内部已有异常处理，失败时返回占位符向量
+            embedding = get_embedding(memory_content)
+            # 额外检查：确保返回的是有效向量
+            if not embedding or not isinstance(embedding, list) or len(embedding) == 0:
+                print(f"[Phone] ⚠️ Embedding 返回无效，使用占位符")
+                embedding = [0.0] * 1536
+            
+            thought_embedding_pair = (memory_content, embedding)
             
             persona.a_mem.add_thought(
                 created, expiration, s, p, o,
@@ -305,7 +343,9 @@ def browse_phone(persona, maze=None, sim_folder=None):
             )
             print(f"[Phone] 已将线上内容写入 {name} 的记忆")
         except Exception as e:
-            print(f"[Phone] 写入记忆失败: {e}")
+            print(f"[Phone] ⚠️ 写入记忆失败: {e}，但继续执行发帖流程")
+            import traceback
+            traceback.print_exc()
     
     # 3. 生成自己的发言
     response = generate_phone_browsing_reaction(persona, recent_posts, maze)
@@ -314,21 +354,29 @@ def browse_phone(persona, maze=None, sim_folder=None):
     if response:
         post = post_online_opinion(persona, response, sim_folder)
         
-        # 同时将自己的发言也写入记忆
+        # 同时将自己的发言也写入记忆（可选，失败不影响发帖）
         try:
             my_post_memory = f"{name}在网上发表了自己的看法：'{response}'"
             created = curr_time
             expiration = curr_time + datetime.timedelta(days=30)
             
-            thought_embedding_pair = (my_post_memory, get_embedding(my_post_memory))
+            # 尝试获取 embedding，如果失败则使用占位符
+            # get_embedding 函数内部已有异常处理，失败时返回占位符向量
+            embedding = get_embedding(my_post_memory)
+            # 额外检查：确保返回的是有效向量
+            if not embedding or not isinstance(embedding, list) or len(embedding) == 0:
+                print(f"[Phone] ⚠️ 发帖记忆 Embedding 返回无效，使用占位符")
+                embedding = [0.0] * 1536
+            
+            thought_embedding_pair = (my_post_memory, embedding)
             
             persona.a_mem.add_thought(
                 created, expiration, name, "posted_online", "opinion",
                 my_post_memory, {"phone", "post", "opinion"}, 6,
                 thought_embedding_pair, None
             )
-        except:
-            pass
+        except Exception as e:
+            print(f"[Phone] ⚠️ 写入发帖记忆失败: {e}，但不影响帖子写入")
         
         print(f"[Phone] {online_name} 发言完成")
     else:
