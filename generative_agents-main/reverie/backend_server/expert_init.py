@@ -75,7 +75,12 @@ def inject_food_poisoning_event(persona, created_time: datetime.datetime) -> Non
     keywords = FOOD_POISONING_EVENT_KEYWORDS
     poignancy = 0.9
     embedding_key = "campus_food_poisoning_event"
-    embedding_vec = get_embedding(description)
+    
+    # ========== EMBEDDING API 调用已注释 ==========
+    # 直接使用占位符向量，避免 API 调用导致的阻塞
+    embedding_vec = [0.0] * 1536
+    # embedding_vec = get_embedding(description)  # 已注释：避免初始化时阻塞
+    
     embedding_pair = (embedding_key, embedding_vec)
     filling = []
 
@@ -224,7 +229,12 @@ def generate_and_broadcast_public_opinion(personas: Dict[str, "Persona"],
         keywords = PUBLIC_OPINION_KEYWORDS
         poignancy = 0.7
         embedding_key = "campus_public_opinion_food_poisoning"
-        embedding_vec = get_embedding(description)
+        
+        # ========== EMBEDDING API 调用已注释 ==========
+        # 直接使用占位符向量，避免 API 调用导致的阻塞
+        embedding_vec = [0.0] * 1536
+        # embedding_vec = get_embedding(description)  # 已注释：避免阻塞
+        
         embedding_pair = (embedding_key, embedding_vec)
         filling: List = []
 
@@ -1162,7 +1172,12 @@ def broadcast_decision_to_civilians(personas: Dict[str, "Persona"],
       keywords = {"专家会议决策", "食品安全", "校园", "家长", "学生", "食堂"}
       poignancy = 0.85  # 高重要性
       embedding_key = f"expert_meeting_decision_{created_time.strftime('%Y%m%d')}"
-      embedding_vec = get_embedding(description[:500])
+      
+      # ========== EMBEDDING API 调用已注释 ==========
+      # 直接使用占位符向量，避免 API 调用导致的阻塞
+      embedding_vec = [0.0] * 1536
+      # embedding_vec = get_embedding(description[:500])  # 已注释：避免阻塞
+      
       embedding_pair = (embedding_key, embedding_vec)
       filling: List = []
       
@@ -1334,7 +1349,12 @@ def write_meeting_memory(persona,
     o = topic[:30] if topic else "食品安全议题"
     description = content
     embedding_key = f"meeting_{memory_type}_{round_num}_{speaker_name}"
-    embedding_vec = get_embedding(description[:500])  # 限制嵌入长度
+    
+    # ========== EMBEDDING API 调用已注释 ==========
+    # 直接使用占位符向量，避免 API 调用导致的阻塞
+    embedding_vec = [0.0] * 1536
+    # embedding_vec = get_embedding(description[:500])  # 已注释：避免阻塞
+    
     embedding_pair = (embedding_key, embedding_vec)
     filling: List = []
 
@@ -1431,8 +1451,10 @@ def add_meeting_to_chat_memory(persona,
     if not chat_filling:
       return
     
+    # ========== EMBEDDING API 调用已注释 ==========
     # 生成嵌入和重要性分数
-    chat_embedding = get_embedding(chat_description)
+    # chat_embedding = get_embedding(chat_description)  # 已注释：避免阻塞
+    chat_embedding = [0.0] * 1536  # 使用占位符向量
     chat_embedding_pair = (chat_description, chat_embedding)
     
     # 专家会议对话的重要性较高

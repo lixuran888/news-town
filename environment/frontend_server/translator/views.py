@@ -974,27 +974,81 @@ def opinion_statistics_chart(request):
   """
   收集全部舆论并生成统计图表数据
   返回：数量统计（直方图）+ 情感统计（线型图）
+  数据来源：
+    1. 社区聊天室留言：storage/{sim_code}/online_opinions/posts.json
+    2. Agent对话：data/chat_logs/all_chats.json (可选)
   """
   try:
     sim_code = request.GET.get("sim_code", "")
-    paths_to_try = []
+    print(f"[opinion_statistics_chart] =========================================")
+    print(f"[opinion_statistics_chart] 📡 收到请求")
+    print(f"[opinion_statistics_chart]   - sim_code: {sim_code}")
+    print(f"[opinion_statistics_chart]   - 时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
+    # 尝试获取社区聊天室留言
+    paths_to_try = []
     if sim_code:
       paths_to_try.append(f"storage/{sim_code}/online_opinions/posts.json")
     paths_to_try.append("storage/base_the_ville_clean/online_opinions/posts.json")
     
     posts_data = None
+    source_path = None
+    print(f"[opinion_statistics_chart] 🔍 开始查找社区聊天室留言数据...")
     for path in paths_to_try:
+      print(f"[opinion_statistics_chart]   检查路径: {path}")
       if os.path.exists(path):
-        with open(path, 'r', encoding='utf-8') as f:
-          posts_data = json.load(f)
-        break
+        print(f"[opinion_statistics_chart]   ✅ 文件存在: {path}")
+        try:
+          with open(path, 'r', encoding='utf-8') as f:
+            posts_data = json.load(f)
+          source_path = path
+          file_size = os.path.getsize(path)
+          print(f"[opinion_statistics_chart]   ✅ 成功读取文件，大小: {file_size} 字节")
+          break
+        except (json.JSONDecodeError, IOError) as e:
+          # 文件可能正在被写入，或格式错误，尝试下一个路径
+          print(f"[opinion_statistics_chart]   ⚠️ 读取文件失败: {e}")
+          continue
+      else:
+        print(f"[opinion_statistics_chart]   ❌ 文件不存在")
+    
+    # 尝试获取Agent对话数据（可选）
+    agent_chats_data = None
+    agent_chats_path = "data/chat_logs/all_chats.json"
+    print(f"[opinion_statistics_chart] 🔍 检查Agent对话数据...")
+    print(f"[opinion_statistics_chart]   检查路径: {agent_chats_path}")
+    if os.path.exists(agent_chats_path):
+      print(f"[opinion_statistics_chart]   ✅ Agent对话文件存在")
+      try:
+        with open(agent_chats_path, 'r', encoding='utf-8') as f:
+          agent_chats_data = json.load(f)
+        file_size = os.path.getsize(agent_chats_path)
+        print(f"[opinion_statistics_chart]   ✅ 成功读取Agent对话文件，大小: {file_size} 字节")
+        if isinstance(agent_chats_data, dict):
+          print(f"[opinion_statistics_chart]   📊 Agent对话数据结构: {list(agent_chats_data.keys())}")
+        elif isinstance(agent_chats_data, list):
+          print(f"[opinion_statistics_chart]   📊 Agent对话数量: {len(agent_chats_data)}")
+      except (json.JSONDecodeError, IOError) as e:
+        print(f"[opinion_statistics_chart]   ⚠️ 读取Agent对话文件失败: {e}")
+    else:
+      print(f"[opinion_statistics_chart]   ❌ Agent对话文件不存在")
     
     if posts_data is None:
+      print(f"[opinion_statistics_chart] ⚠️ 未找到社区聊天室留言数据")
+      print(f"[opinion_statistics_chart]   尝试的路径: {paths_to_try}")
+    
+    if posts_data is None:
+      print(f"[opinion_statistics_chart] 📤 返回空数据响应")
       return JsonResponse({
         "success": True,
         "enabled": SENTIMENT_ENABLED,
         "message": "舆论库尚未创建",
+        "data_source": {
+          "community_posts": None,
+          "agent_chats": agent_chats_data is not None,
+          "community_posts_path": None,
+          "agent_chats_path": agent_chats_path if agent_chats_data else None
+        },
         "chart_data": {
           "dates": [],
           "counts": {"total": [], "positive": [], "negative": [], "neutral": []},
@@ -1010,9 +1064,21 @@ def opinion_statistics_chart(request):
       })
     
     posts = posts_data.get("posts", [])
+    print(f"[opinion_statistics_chart] 📊 数据统计:")
+    print(f"[opinion_statistics_chart]   - 社区聊天室留言: {len(posts)} 条")
+    print(f"[opinion_statistics_chart]   - 数据来源: {source_path}")
+    if agent_chats_data:
+      if isinstance(agent_chats_data, dict):
+        agent_chat_count = sum(len(v) if isinstance(v, list) else 1 for v in agent_chats_data.values())
+      elif isinstance(agent_chats_data, list):
+        agent_chat_count = len(agent_chats_data)
+      else:
+        agent_chat_count = 0
+      print(f"[opinion_statistics_chart]   - Agent对话: {agent_chat_count} 条（已找到但未合并）")
     
     # 按日期分组统计
     date_buckets = {}
+    valid_posts_count = 0
     for post in posts:
       ts = post.get("timestamp", "")
       content = post.get("content", "")
@@ -1023,8 +1089,10 @@ def opinion_statistics_chart(request):
         dt = None
       
       if not dt:
+        print(f"[opinion_statistics_chart] ⚠️ 跳过无效时间戳的帖子: {ts}")
         continue
       
+      valid_posts_count += 1
       date_key = dt.strftime("%Y-%m-%d")
       bucket = date_buckets.setdefault(date_key, {
         "date": date_key,
@@ -1035,11 +1103,16 @@ def opinion_statistics_chart(request):
         "scores": []
       })
       
-      # 情感分析
+      # 情感分析（带错误处理）
       if SENTIMENT_ENABLED:
-        result = analyze_sentiment(content)
-        label = result.get("label", "neutral")
-        score = result.get("score", 0.0)
+        try:
+          result = analyze_sentiment(content)
+          label = result.get("label", "neutral")
+          score = result.get("score", 0.0)
+        except Exception as sent_error:
+          print(f"[opinion_statistics_chart] ⚠️ 情感分析失败（帖子ID: {post.get('id', 'unknown')}）: {sent_error}")
+          label = "neutral"
+          score = 0.0
       else:
         label = "neutral"
         score = 0.0
@@ -1053,6 +1126,8 @@ def opinion_statistics_chart(request):
         bucket["neutral"] += 1
       
       bucket["scores"].append(score)
+    
+    print(f"[opinion_statistics_chart] 有效帖子数: {valid_posts_count}, 日期分组数: {len(date_buckets)}")
     
     # 构建图表数据（按日期排序）
     sorted_dates = sorted(date_buckets.keys())
@@ -1078,6 +1153,8 @@ def opinion_statistics_chart(request):
       avg_score = round(sum(bucket["scores"]) / len(bucket["scores"]), 3) if bucket["scores"] else 0.0
       chart_data["sentiment_scores"].append(avg_score)
     
+    print(f"[opinion_statistics_chart] ✅ 图表数据构建完成: {len(sorted_dates)} 个日期")
+    
     # 总体统计
     total_stats = {
       "total_posts": len(posts),
@@ -1091,11 +1168,23 @@ def opinion_statistics_chart(request):
       )
     }
     
+    print(f"[opinion_statistics_chart] ✅ 准备返回响应")
+    print(f"[opinion_statistics_chart]   - 日期数量: {len(sorted_dates)}")
+    print(f"[opinion_statistics_chart]   - 总帖子数: {total_stats['total_posts']}")
+    print(f"[opinion_statistics_chart]   - 正面: {total_stats['total_positive']}, 负面: {total_stats['total_negative']}, 中性: {total_stats['total_neutral']}")
+    print(f"[opinion_statistics_chart] =========================================")
+    
     return JsonResponse({
       "enabled": SENTIMENT_ENABLED,
       "chart_data": chart_data,
       "statistics": total_stats,
-      "success": True
+      "success": True,
+      "data_source": {
+        "community_posts": True,
+        "agent_chats": agent_chats_data is not None,
+        "community_posts_path": source_path,
+        "agent_chats_path": agent_chats_path if agent_chats_data else None
+      }
     })
     
   except Exception as e:

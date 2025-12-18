@@ -16,7 +16,7 @@
     </div>
     <!-- 舆论统计按钮 - 始终显示，不受mode影响 -->
     <div class="map-controls">
-      <button id="opinion_chart_btn" type="button" class="btn btn-xs btn-primary" style="margin-right: 5px;" onclick="console.log('[舆论统计] 按钮onclick触发'); console.log('[舆论统计] window对象:', window); console.log('[舆论统计] window.openOpinionChart类型:', typeof window.openOpinionChart); console.log('[舆论统计] window.openOpinionChart值:', window.openOpinionChart); try { if(typeof window.openOpinionChart === 'function') { console.log('[舆论统计] ✅ 调用openOpinionChart'); window.openOpinionChart(); } else { console.error('[舆论统计] ❌ openOpinionChart不是函数，类型:', typeof window.openOpinionChart); console.log('[舆论统计] 尝试直接调用...'); const overlay = document.getElementById('opinion-chart-overlay'); console.log('[舆论统计] 直接查找弹窗:', overlay); if(overlay) { overlay.style.display = 'flex'; console.log('[舆论统计] ✅ 弹窗已显示'); } } } catch(e) { console.error('[舆论统计] ❌ 错误:', e); }">
+      <button id="opinion_chart_btn" type="button" class="btn btn-xs btn-primary" style="margin-right: 5px;" onclick="console.log('[舆论统计] 按钮onclick触发'); console.log('[舆论统计] window对象:', window); console.log('[舆论统计] openOpinionChart类型:', typeof window.openOpinionChart); if(window.openOpinionChart) { window.openOpinionChart(); } else { console.error('[舆论统计] openOpinionChart未定义，当前window对象:', Object.keys(window).filter(k => k.includes('Opinion') || k.includes('Chart'))); } return false;">
         <i class="glyphicon glyphicon-stats"></i> 舆论统计
       </button>
     </div>
@@ -104,7 +104,7 @@
 </div>
 
 <!-- 舆论统计图表弹窗 -->
-<div id="opinion-chart-overlay" class="persona-detail-overlay">
+<div id="opinion-chart-overlay" class="persona-detail-overlay" style="display:none;">
   <section class="persona-detail-board" style="max-width: 900px;">
     <header class="persona-detail-header">
       <div>
@@ -112,7 +112,7 @@
         <span class="persona-detail-subtitle">数量统计（直方图）+ 情感统计（线型图）</span>
       </div>
       <div class="persona-detail-actions">
-        <button class="persona-detail-close" id="opinion-chart-close" aria-label="关闭弹窗" onclick="console.log('[舆论统计] 关闭按钮onclick触发'); if(window.closeOpinionChart) { window.closeOpinionChart(); } else { const overlay = document.getElementById('opinion-chart-overlay'); if(overlay) { overlay.style.display = 'none'; console.log('[舆论统计] ✅ 弹窗已关闭（备用方案）'); } } return false;">×</button>
+        <button class="persona-detail-close" id="opinion-chart-close" aria-label="关闭弹窗">×</button>
       </div>
     </header>
     <div class="persona-detail-body" id="opinion-chart-body" style="padding: 20px;">
@@ -324,6 +324,8 @@
   background: linear-gradient(180deg, #A0826D 0%, #8B6F47 100%);
   color: #FFF8E7;
   border-bottom: 3px solid #6B4E3D;
+  position: relative;
+  z-index: 10002;
 }
 
 .persona-detail-title {
@@ -342,6 +344,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  position: relative;
+  z-index: 10003;
+  pointer-events: auto;
 }
 
 .persona-detail-close {
@@ -354,16 +359,23 @@
   font-size: 20px;
   cursor: pointer;
   transition: transform 0.1s ease, box-shadow 0.2s ease;
+  z-index: 10001;
   position: relative;
-  z-index: 10;
   pointer-events: auto;
   user-select: none;
   -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 .persona-detail-close:hover {
   box-shadow: 0 0 0 2px #F5F5DC;
   transform: scale(1.05);
+  background: #8B6E5D;
+}
+
+.persona-detail-close:active {
+  transform: scale(0.95);
 }
 
 .persona-detail-body {
@@ -878,7 +890,7 @@
 
 <!-- partial -->
 <script src='https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js'></script>
-<!-- expert_trigger_detector.js 已移除：功能已通过API实现，文件不存在导致404错误 -->
+<script src="/seminar_expert/frontend/expert_trigger_detector.js"></script>
 {% include 'home/main_script.html' %}
 
 <style>
@@ -912,6 +924,428 @@
 
 {% block js_content %}
 <script type="text/javascript">
+// ============================================
+// 舆论统计图表功能 - 立即定义全局函数
+// ============================================
+console.log('[舆论统计] 📝 开始定义全局函数...');
+
+// 确保在定义前清除旧的定义
+if (window.openOpinionChart) {
+  console.log('[舆论统计] ⚠️ 发现旧的openOpinionChart定义，将被覆盖');
+}
+
+let opinionChart = null;
+
+window.openOpinionChart = function() {
+  console.log('[舆论统计] ✅ openOpinionChart被调用');
+  const chartOverlay = document.getElementById('opinion-chart-overlay');
+  if (!chartOverlay) {
+    console.error('[舆论统计] ❌ 弹窗元素未找到: opinion-chart-overlay');
+    // 延迟重试
+    setTimeout(function() {
+      window.openOpinionChart();
+    }, 200);
+    return;
+  }
+  chartOverlay.style.display = 'flex';
+  if (window.loadOpinionChartData) {
+    window.loadOpinionChartData();
+  } else {
+    console.error('[舆论统计] ❌ loadOpinionChartData未定义，延迟重试...');
+    setTimeout(function() {
+      if (window.loadOpinionChartData) {
+        window.loadOpinionChartData();
+      } else {
+        console.error('[舆论统计] ❌ loadOpinionChartData仍未定义');
+      }
+    }, 200);
+  }
+};
+
+window.closeOpinionChart = function() {
+  console.log('[舆论统计] ✅ closeOpinionChart被调用');
+  const chartOverlay = document.getElementById('opinion-chart-overlay');
+  if (chartOverlay) {
+    chartOverlay.style.display = 'none';
+    console.log('[舆论统计] ✅ 弹窗已隐藏');
+  } else {
+    console.error('[舆论统计] ❌ 弹窗元素未找到');
+  }
+  if (opinionChart) {
+    opinionChart.destroy();
+    opinionChart = null;
+    console.log('[舆论统计] ✅ 图表已销毁');
+  }
+  if (window.opinionChartInstance) {
+    window.opinionChartInstance.destroy();
+    window.opinionChartInstance = null;
+  }
+};
+
+// 定义 loadOpinionChartData 在全局作用域
+window.loadOpinionChartData = function() {
+  console.log('[舆论统计] ✅ loadOpinionChartData被调用');
+  loadOpinionChart();
+};
+
+// 定义 loadOpinionChart 函数（在全局作用域）
+function loadOpinionChart() {
+  console.log('[舆论统计] 📊 开始加载舆论数据...');
+  const chartLoading = document.getElementById('opinion-chart-loading');
+  const chartContainer = document.getElementById('opinion-chart-container');
+  const chartError = document.getElementById('opinion-chart-error');
+  const chartStats = document.getElementById('opinion-chart-stats');
+  
+  // 显示加载状态
+  if (chartLoading) {
+    chartLoading.style.display = 'block';
+    chartLoading.innerHTML = '<p>正在加载舆论数据...</p><p style="font-size: 12px; color: #666;">请稍候</p>';
+  }
+  if (chartContainer) chartContainer.style.display = 'none';
+  if (chartError) chartError.style.display = 'none';
+  if (chartStats) chartStats.style.display = 'none';
+
+  // 获取sim_code
+  const simCode = '{{ sim_code|default:"" }}';
+  const url = '/opinion_statistics_chart/?sim_code=' + encodeURIComponent(simCode);
+  console.log('[舆论统计] 📡 请求URL:', url);
+  console.log('[舆论统计] 📡 sim_code:', simCode);
+  
+  const startTime = Date.now();
+  fetch(url)
+    .then(function(response) {
+      const elapsed = Date.now() - startTime;
+      console.log('[舆论统计] ✅ 收到响应，耗时:', elapsed + 'ms');
+      console.log('[舆论统计] 📡 响应状态:', response.status, response.statusText);
+      if (!response.ok) {
+        throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+      }
+      return response.json();
+    })
+    .then(function(data) {
+      console.log('[舆论统计] 📦 解析JSON完成');
+      console.log('[舆论统计] 📦 数据内容:', JSON.stringify(data, null, 2));
+      const chartLoading = document.getElementById('opinion-chart-loading');
+      const chartContainer = document.getElementById('opinion-chart-container');
+      const chartError = document.getElementById('opinion-chart-error');
+      const chartStats = document.getElementById('opinion-chart-stats');
+      
+      if (chartLoading) chartLoading.style.display = 'none';
+      
+      // 显示数据来源信息
+      console.log('[舆论统计] 📊 数据统计:');
+      console.log('  - success:', data.success);
+      console.log('  - enabled:', data.enabled);
+      console.log('  - message:', data.message || '(无)');
+      console.log('  - 总帖子数:', data.statistics?.total_posts || 0);
+      console.log('  - 日期数量:', data.chart_data?.dates?.length || 0);
+      
+      // 确保 chart_data 和 statistics 存在（即使为空）
+      const chartData = data.chart_data || {
+        dates: [],
+        counts: { total: [], positive: [], negative: [], neutral: [] },
+        sentiment_scores: []
+      };
+      
+      console.log('[舆论统计] 📊 图表数据详情:');
+      console.log('  - dates:', chartData.dates);
+      console.log('  - counts.total:', chartData.counts?.total);
+      console.log('  - counts.positive:', chartData.counts?.positive);
+      console.log('  - counts.negative:', chartData.counts?.negative);
+      console.log('  - counts.neutral:', chartData.counts?.neutral);
+      console.log('  - sentiment_scores:', chartData.sentiment_scores);
+      const stats = data.statistics || {
+        total_posts: 0,
+        total_positive: 0,
+        total_negative: 0,
+        total_neutral: 0,
+        average_sentiment: 0.0
+      };
+      
+      // 始终显示统计信息（即使都是0）
+      if (chartStats) {
+        chartStats.innerHTML = 
+        '<div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 15px;">' +
+          '<div style="text-align: center;">' +
+            '<div style="font-size: 24px; font-weight: bold; color: #333;">' + (stats.total_posts || 0) + '</div>' +
+            '<div style="font-size: 12px; color: #666;">总帖子数</div>' +
+          '</div>' +
+          '<div style="text-align: center;">' +
+            '<div style="font-size: 24px; font-weight: bold; color: #4CAF50;">' + (stats.total_positive || 0) + '</div>' +
+            '<div style="font-size: 12px; color: #666;">正面</div>' +
+          '</div>' +
+          '<div style="text-align: center;">' +
+            '<div style="font-size: 24px; font-weight: bold; color: #f44336;">' + (stats.total_negative || 0) + '</div>' +
+            '<div style="font-size: 12px; color: #666;">负面</div>' +
+          '</div>' +
+          '<div style="text-align: center;">' +
+            '<div style="font-size: 24px; font-weight: bold; color: #9E9E9E;">' + (stats.total_neutral || 0) + '</div>' +
+            '<div style="font-size: 12px; color: #666;">中性</div>' +
+          '</div>' +
+          '<div style="text-align: center;">' +
+            '<div style="font-size: 24px; font-weight: bold; color: #2196F3;">' + (stats.average_sentiment || 0) + '</div>' +
+            '<div style="font-size: 12px; color: #666;">平均情感分</div>' +
+          '</div>' +
+          '</div>';
+        chartStats.style.display = 'block';
+      }
+      
+      // 绘制图表（即使没有数据也显示空图表）
+      if (chartData.dates && chartData.dates.length > 0 && 
+          chartData.counts && chartData.counts.total && chartData.counts.total.length > 0) {
+        // 有数据，绘制正常图表
+        drawChart(chartData);
+        if (chartContainer) chartContainer.style.display = 'block';
+      } else {
+        // 没有数据，显示空图表
+        drawEmptyChart();
+        if (chartContainer) chartContainer.style.display = 'block';
+        if (stats.total_posts === 0 && chartError) {
+          chartError.style.display = 'block';
+          chartError.innerHTML = '<p style="color: #999;">暂无数据，图表为空</p>';
+        }
+      }
+    })
+    .catch(function(error) {
+      const elapsed = Date.now() - startTime;
+      console.error('[舆论统计] ❌ 加载失败，耗时:', elapsed + 'ms');
+      console.error('[舆论统计] ❌ 错误详情:', error);
+      console.error('[舆论统计] ❌ 错误堆栈:', error.stack);
+      
+      const chartLoading = document.getElementById('opinion-chart-loading');
+      const chartContainer = document.getElementById('opinion-chart-container');
+      const chartError = document.getElementById('opinion-chart-error');
+      
+      if (chartLoading) chartLoading.style.display = 'none';
+      if (chartError) {
+        chartError.style.display = 'block';
+        chartError.innerHTML = '<p style="color: #f44336;">加载失败：' + error.message + '</p>' +
+          '<p style="font-size: 12px; color: #666;">请检查控制台查看详细错误信息</p>';
+      }
+      // 即使失败，也显示空图表
+      drawEmptyChart();
+      if (chartContainer) chartContainer.style.display = 'block';
+    });
+}
+
+// 定义 drawChart 和 drawEmptyChart 在全局作用域
+function drawChart(chartData) {
+  console.log('[舆论统计] 📈 drawChart 被调用，数据:', chartData);
+  const ctx = document.getElementById('opinion-chart-canvas');
+  if (!ctx) {
+    console.error('[舆论统计] ❌ Canvas元素未找到');
+    return;
+  }
+  
+  const canvasCtx = ctx.getContext('2d');
+  
+  // 销毁旧图表
+  if (opinionChart) {
+    opinionChart.destroy();
+    opinionChart = null;
+  }
+  
+  // 检查Chart是否可用
+  if (typeof Chart === 'undefined') {
+    console.error('[舆论统计] ❌ Chart.js库未加载');
+    const chartError = document.getElementById('opinion-chart-error');
+    if (chartError) {
+      chartError.style.display = 'block';
+      chartError.innerHTML = '<p>Chart.js库未加载，请刷新页面重试</p>';
+    }
+    return;
+  }
+  
+  console.log('[舆论统计] ✅ 开始绘制图表');
+  // 创建组合图表：柱状图（数量）+ 折线图（情感分数）
+  opinionChart = new Chart(canvasCtx, {
+    type: 'bar',
+    data: {
+      labels: chartData.dates,
+      datasets: [
+        {
+          label: '总帖子数',
+          data: chartData.counts.total,
+          backgroundColor: 'rgba(33, 150, 243, 0.6)',
+          borderColor: 'rgba(33, 150, 243, 1)',
+          borderWidth: 1,
+          yAxisID: 'y'
+        },
+        {
+          label: '正面',
+          data: chartData.counts.positive,
+          backgroundColor: 'rgba(76, 175, 80, 0.6)',
+          borderColor: 'rgba(76, 175, 80, 1)',
+          borderWidth: 1,
+          yAxisID: 'y'
+        },
+        {
+          label: '负面',
+          data: chartData.counts.negative,
+          backgroundColor: 'rgba(244, 67, 54, 0.6)',
+          borderColor: 'rgba(244, 67, 54, 1)',
+          borderWidth: 1,
+          yAxisID: 'y'
+        },
+        {
+          label: '中性',
+          data: chartData.counts.neutral,
+          backgroundColor: 'rgba(158, 158, 158, 0.6)',
+          borderColor: 'rgba(158, 158, 158, 1)',
+          borderWidth: 1,
+          yAxisID: 'y'
+        },
+        {
+          label: '平均情感分数',
+          data: chartData.sentiment_scores,
+          type: 'line',
+          borderColor: 'rgba(255, 152, 0, 1)',
+          backgroundColor: 'rgba(255, 152, 0, 0.1)',
+          borderWidth: 2,
+          fill: false,
+          tension: 0.4,
+          yAxisID: 'y1',
+          pointRadius: 4,
+          pointHoverRadius: 6
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 2,
+      plugins: {
+        title: {
+          display: true,
+          text: '舆论数量统计（直方图）+ 情感趋势（线型图）',
+          font: { size: 16 }
+        },
+        legend: {
+          display: true,
+          position: 'top'
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false
+        }
+      },
+      scales: {
+        y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
+          title: {
+            display: true,
+            text: '帖子数量'
+          },
+          beginAtZero: true
+        },
+        y1: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          title: {
+            display: true,
+            text: '情感分数'
+          },
+          beginAtZero: false,
+          grid: {
+            drawOnChartArea: false
+          }
+        },
+        x: {
+          title: {
+            display: true,
+            text: '日期'
+          }
+        }
+      }
+    }
+  });
+  console.log('[舆论统计] ✅ 图表绘制完成');
+}
+
+function drawEmptyChart() {
+  console.log('[舆论统计] 📈 drawEmptyChart 被调用');
+  const ctx = document.getElementById('opinion-chart-canvas');
+  if (!ctx) {
+    console.error('[舆论统计] ❌ Canvas元素未找到');
+    return;
+  }
+  
+  // 销毁旧图表
+  if (opinionChart) {
+    opinionChart.destroy();
+    opinionChart = null;
+  }
+  
+  // 检查Chart是否可用
+  if (typeof Chart === 'undefined') {
+    console.error('[舆论统计] ❌ Chart.js库未加载');
+    return;
+  }
+  
+  console.log('[舆论统计] ✅ 开始绘制空图表');
+  // 创建空图表
+  opinionChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['暂无数据'],
+      datasets: [
+        {
+          label: '总帖子数',
+          data: [0],
+          backgroundColor: 'rgba(200, 200, 200, 0.3)',
+          borderColor: 'rgba(200, 200, 200, 0.5)',
+          borderWidth: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 2,
+      plugins: {
+        title: {
+          display: true,
+          text: '舆论数量统计（直方图）+ 情感趋势（线型图）',
+          font: { size: 16 }
+        },
+        legend: {
+          display: true,
+          position: 'top'
+        },
+        tooltip: {
+          enabled: false
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: '帖子数量'
+          }
+        },
+        x: {
+          title: {
+            display: true,
+            text: '日期'
+          }
+        }
+      }
+    }
+  });
+  console.log('[舆论统计] ✅ 空图表绘制完成');
+}
+
+// 验证函数是否已定义
+console.log('[舆论统计] ✅ 全局函数已定义');
+console.log('[舆论统计] openOpinionChart类型:', typeof window.openOpinionChart);
+console.log('[舆论统计] closeOpinionChart类型:', typeof window.closeOpinionChart);
+console.log('[舆论统计] loadOpinionChartData类型:', typeof window.loadOpinionChartData);
+console.log('[舆论统计] drawChart类型:', typeof drawChart);
+console.log('[舆论统计] drawEmptyChart类型:', typeof drawEmptyChart);
 // 使用事件委托，确保按钮点击事件能正常工作
 $(document).on('click', '.state-details-btn', function(e) {
   e.preventDefault();
@@ -1917,86 +2351,11 @@ function renderPersonaDetail(container, data) {
 
 </script>
 
-// 舆论统计图表功能
-// 立即定义全局函数，确保onclick能立即工作（不等待DOM加载）
-window.openOpinionChart = function() {
-  console.log('[舆论统计] ✅ openOpinionChart被调用');
-  const overlay = document.getElementById('opinion-chart-overlay');
-  console.log('[舆论统计] 弹窗元素:', overlay);
-  if (overlay) {
-    console.log('[舆论统计] 设置display为flex');
-    overlay.style.display = 'flex';
-    console.log('[舆论统计] 弹窗display:', overlay.style.display);
-    console.log('[舆论统计] 弹窗computed style:', window.getComputedStyle(overlay).display);
-    
-    // 如果已经初始化，调用loadOpinionChart
-    if (window.loadOpinionChartData) {
-      console.log('[舆论统计] 调用loadOpinionChartData');
-      window.loadOpinionChartData();
-    } else {
-      console.log('[舆论统计] ⏳ 等待初始化完成...');
-      // 延迟一点再试
-      setTimeout(function() {
-        if (window.loadOpinionChartData) {
-          console.log('[舆论统计] 延迟后调用loadOpinionChartData');
-          window.loadOpinionChartData();
-        } else {
-          console.warn('[舆论统计] ⚠️ loadOpinionChartData仍未定义');
-        }
-      }, 200);
-    }
-  } else {
-    console.error('[舆论统计] ❌ 弹窗元素未找到: opinion-chart-overlay');
-    console.log('[舆论统计] 尝试查找所有包含opinion的元素:');
-    const allElements = document.querySelectorAll('[id*="opinion"], [class*="opinion"]');
-    console.log('找到的元素:', Array.from(allElements).map(el => ({
-      id: el.id,
-      className: el.className,
-      tagName: el.tagName
-    })));
-  }
-};
-
-console.log('[舆论统计] ✅ openOpinionChart函数已定义');
-
-// 确保在DOM加载完成后执行完整初始化
+<script>
+// 舆论统计图表功能 - 初始化代码
 (function() {
-    console.log('[舆论统计] ✅ openOpinionChart被调用');
-    const overlay = document.getElementById('opinion-chart-overlay');
-    console.log('[舆论统计] 弹窗元素:', overlay);
-    if (overlay) {
-      console.log('[舆论统计] 设置display为flex');
-      overlay.style.display = 'flex';
-      console.log('[舆论统计] 弹窗display:', overlay.style.display);
-      console.log('[舆论统计] 弹窗computed style:', window.getComputedStyle(overlay).display);
-      
-      // 如果已经初始化，调用loadOpinionChart
-      if (window.loadOpinionChartData) {
-        console.log('[舆论统计] 调用loadOpinionChartData');
-        window.loadOpinionChartData();
-      } else {
-        console.log('[舆论统计] ⏳ 等待初始化完成...');
-        // 延迟一点再试
-        setTimeout(function() {
-          if (window.loadOpinionChartData) {
-            console.log('[舆论统计] 延迟后调用loadOpinionChartData');
-            window.loadOpinionChartData();
-          } else {
-            console.warn('[舆论统计] ⚠️ loadOpinionChartData仍未定义');
-          }
-        }, 200);
-      }
-    } else {
-      console.error('[舆论统计] ❌ 弹窗元素未找到: opinion-chart-overlay');
-      console.log('[舆论统计] 尝试查找所有包含opinion的元素:');
-      const allElements = document.querySelectorAll('[id*="opinion"], [class*="opinion"]');
-      console.log('找到的元素:', Array.from(allElements).map(el => ({
-        id: el.id,
-        className: el.className,
-        tagName: el.tagName
-      })));
-    }
-  };
+  // 使用全局的 opinionChart 变量
+  // opinionChart 已在全局作用域定义
   
   function initOpinionChart() {
     const chartBtn = document.getElementById('opinion_chart_btn');
@@ -2006,420 +2365,96 @@ console.log('[舆论统计] ✅ openOpinionChart函数已定义');
     const chartContainer = document.getElementById('opinion-chart-container');
     const chartError = document.getElementById('opinion-chart-error');
     const chartStats = document.getElementById('opinion-chart-stats');
-    let opinionChart = null;
-    
-    // 调试信息
-    console.log('[舆论统计] 初始化...', {
-      chartBtn: !!chartBtn,
-      chartOverlay: !!chartOverlay,
-      chartCloseBtn: !!chartCloseBtn,
-      chartLoading: !!chartLoading,
-      chartContainer: !!chartContainer,
-      chartError: !!chartError,
-      chartStats: !!chartStats
-    });
     
     if (!chartBtn) {
-      console.error('[舆论统计] ❌ 按钮未找到: opinion_chart_btn');
-      return;
+      console.error('[舆论统计] ❌ 按钮元素未找到: opinion_chart_btn');
     }
-    
     if (!chartOverlay) {
-      console.error('[舆论统计] ❌ 弹窗未找到: opinion-chart-overlay');
+      console.error('[舆论统计] ❌ 弹窗元素未找到: opinion-chart-overlay');
+    }
+    
+    if (!chartBtn || !chartOverlay) {
+      console.error('[舆论统计] ❌ 未找到必要的DOM元素，延迟重试...');
+      // 延迟重试
+      setTimeout(function() {
+        initOpinionChart();
+      }, 500);
       return;
     }
     
-    // 确保弹窗初始状态是隐藏的
-    chartOverlay.style.display = 'none';
-    console.log('[舆论统计] ✅ 弹窗初始化完成，当前状态: hidden');
+    console.log('[舆论统计] ✅ 初始化完成，找到所有元素');
     
-    // 打开弹窗的函数
-    function openChart() {
-      console.log('[舆论统计] ✅ openChart函数被调用');
-      if (!chartOverlay) {
-        console.error('[舆论统计] ❌ chartOverlay未找到');
-        return;
-      }
-      chartOverlay.style.display = 'flex';
-      loadOpinionChart();
-    }
-    
-    // 暴露到全局，供onclick备用（覆盖临时版本）
-    window.openOpinionChart = openChart;
-    window.loadOpinionChartData = loadOpinionChart;
-    
-    // 使用addEventListener绑定
+    // 打开弹窗（addEventListener作为备用）
     chartBtn.addEventListener('click', function(e) {
       e.preventDefault();
       e.stopPropagation();
       console.log('[舆论统计] ✅ addEventListener触发');
-      openChart();
+      window.openOpinionChart();
     });
     
-    // 也尝试使用jQuery（如果可用）
-    if (typeof $ !== 'undefined') {
-      $(chartBtn).on('click', function(e) {
+    // 关闭弹窗 - 使用事件委托确保能工作
+    if (chartCloseBtn) {
+      console.log('[舆论统计] ✅ 找到关闭按钮，绑定事件');
+      // 清除所有旧的事件监听器
+      const newCloseBtn = chartCloseBtn.cloneNode(true);
+      chartCloseBtn.parentNode.replaceChild(newCloseBtn, chartCloseBtn);
+      
+      // 重新绑定事件
+      newCloseBtn.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        console.log('[舆论统计] ✅ jQuery事件触发');
-        openChart();
-      });
+        e.stopImmediatePropagation();
+        console.log('[舆论统计] ✅ 关闭按钮addEventListener触发');
+        window.closeOpinionChart();
+        return false;
+      }, true); // 使用捕获阶段
+      
+      newCloseBtn.onclick = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        console.log('[舆论统计] ✅ 关闭按钮onclick触发');
+        window.closeOpinionChart();
+        return false;
+      };
+      
+      // 设置属性作为最后备用
+      newCloseBtn.setAttribute('onclick', 'window.closeOpinionChart(); return false;');
+      newCloseBtn.style.pointerEvents = 'auto';
+      newCloseBtn.style.cursor = 'pointer';
+      console.log('[舆论统计] ✅ 关闭按钮事件绑定完成');
+    } else {
+      console.error('[舆论统计] ❌ 关闭按钮未找到: opinion-chart-close');
     }
-  
-  // 关闭弹窗
-  // 关闭弹窗的函数
-  function closeChart() {
-    console.log('[舆论统计] ✅ closeChart函数被调用');
+    
+    // 使用事件委托在overlay上监听关闭按钮点击
     if (chartOverlay) {
-      chartOverlay.style.display = 'none';
-      console.log('[舆论统计] ✅ 弹窗已隐藏');
+      chartOverlay.addEventListener('click', function(e) {
+        // 如果点击的是关闭按钮或其子元素
+        if (e.target && (e.target.id === 'opinion-chart-close' || e.target.closest('#opinion-chart-close'))) {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('[舆论统计] ✅ 通过事件委托关闭弹窗');
+          window.closeOpinionChart();
+          return false;
+        }
+        // 如果点击的是遮罩层本身
+        if (e.target === chartOverlay) {
+          console.log('[舆论统计] ✅ 点击遮罩层，关闭弹窗');
+          window.closeOpinionChart();
+        }
+      }, true); // 使用捕获阶段
     }
-    if (opinionChart) {
-      opinionChart.destroy();
-      opinionChart = null;
-      console.log('[舆论统计] ✅ 图表已销毁');
-    }
-  }
-  
-  // 暴露到全局，供onclick备用
-  window.closeOpinionChart = closeChart;
-  
-  // 绑定关闭按钮事件
-  if (chartCloseBtn) {
-    console.log('[舆论统计] ✅ 找到关闭按钮，绑定事件');
-    chartCloseBtn.addEventListener('click', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log('[舆论统计] ✅ 关闭按钮addEventListener触发');
-      closeChart();
-    });
     
-    // 也尝试使用jQuery（如果可用）
-    if (typeof $ !== 'undefined') {
-      $(chartCloseBtn).on('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        console.log('[舆论统计] ✅ 关闭按钮jQuery事件触发');
-        closeChart();
+    // 防止点击弹窗内容区域时关闭
+    const chartBody = document.getElementById('opinion-chart-body');
+    if (chartBody) {
+      chartBody.addEventListener('click', function(e) {
+        e.stopPropagation(); // 阻止事件冒泡到遮罩层
       });
     }
-  } else {
-    console.error('[舆论统计] ❌ 关闭按钮未找到: opinion-chart-close');
-  }
-  
-  // 点击遮罩层关闭弹窗
-  chartOverlay.addEventListener('click', function(e) {
-    // 如果点击的是遮罩层本身（不是内部元素），则关闭
-    if (e.target === chartOverlay) {
-      console.log('[舆论统计] ✅ 点击遮罩层，关闭弹窗');
-      closeChart();
-    }
-  });
-  
-  // 防止点击弹窗内容区域时关闭
-  const chartBody = document.getElementById('opinion-chart-body');
-  if (chartBody) {
-    chartBody.addEventListener('click', function(e) {
-      e.stopPropagation(); // 阻止事件冒泡到遮罩层
-    });
-  }
-  
-  function loadOpinionChart() {
-    console.log('[舆论统计] 开始加载数据...');
     
-    // 显示加载状态
-    if (chartLoading) chartLoading.style.display = 'block';
-    if (chartContainer) chartContainer.style.display = 'none';
-    if (chartError) chartError.style.display = 'none';
-    if (chartStats) chartStats.style.display = 'none';
-    
-    // 获取sim_code
-    const simCode = '{{ sim_code|default:"" }}';
-    const url = '/opinion_statistics_chart/?sim_code=' + encodeURIComponent(simCode);
-    console.log('[舆论统计] 请求URL:', url);
-    
-    fetch(url)
-      .then(function(response) {
-        console.log('[舆论统计] 响应状态:', response.status);
-        if (!response.ok) {
-          throw new Error('HTTP ' + response.status + ': ' + response.statusText);
-        }
-        return response.json();
-      })
-      .then(function(data) {
-        console.log('[舆论统计] 收到数据:', data);
-        
-        if (chartLoading) chartLoading.style.display = 'none';
-        
-        // 即使没有数据，也显示统计信息和空图表
-        const stats = data.statistics || {
-          total_posts: 0,
-          total_positive: 0,
-          total_negative: 0,
-          total_neutral: 0,
-          average_sentiment: 0
-        };
-        
-        // 显示统计信息（即使都是0）
-        if (chartStats) {
-          chartStats.innerHTML = 
-            '<div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 15px;">' +
-              '<div style="text-align: center;">' +
-                '<div style="font-size: 24px; font-weight: bold; color: #333;">' + (stats.total_posts || 0) + '</div>' +
-                '<div style="font-size: 12px; color: #666;">总帖子数</div>' +
-              '</div>' +
-              '<div style="text-align: center;">' +
-                '<div style="font-size: 24px; font-weight: bold; color: #4CAF50;">' + (stats.total_positive || 0) + '</div>' +
-                '<div style="font-size: 12px; color: #666;">正面</div>' +
-              '</div>' +
-              '<div style="text-align: center;">' +
-                '<div style="font-size: 24px; font-weight: bold; color: #f44336;">' + (stats.total_negative || 0) + '</div>' +
-                '<div style="font-size: 12px; color: #666;">负面</div>' +
-              '</div>' +
-              '<div style="text-align: center;">' +
-                '<div style="font-size: 24px; font-weight: bold; color: #9E9E9E;">' + (stats.total_neutral || 0) + '</div>' +
-                '<div style="font-size: 12px; color: #666;">中性</div>' +
-              '</div>' +
-              '<div style="text-align: center;">' +
-                '<div style="font-size: 24px; font-weight: bold; color: #2196F3;">' + (stats.average_sentiment || 0) + '</div>' +
-                '<div style="font-size: 12px; color: #666;">平均情感分</div>' +
-              '</div>' +
-            '</div>';
-          chartStats.style.display = 'block';
-        }
-        
-        // 绘制图表（即使没有数据也显示空图表）
-        const chartData = data.chart_data || {
-          dates: [],
-          positive_counts: [],
-          negative_counts: [],
-          neutral_counts: [],
-          sentiment_scores: []
-        };
-        
-        if (chartData.dates && chartData.dates.length > 0) {
-          drawChart(chartData);
-          if (chartContainer) chartContainer.style.display = 'block';
-        } else {
-          // 没有数据时，显示空图表
-          console.log('[舆论统计] 暂无数据，显示空图表');
-          drawEmptyChart();
-          if (chartContainer) chartContainer.style.display = 'block';
-          if (chartError) {
-            chartError.style.display = 'block';
-            chartError.innerHTML = '<p style="color: #999;">暂无数据，图表为空</p>';
-          }
-        }
-      })
-      .catch(function(error) {
-        console.error('[舆论统计] ❌ 加载失败:', error);
-        if (chartLoading) chartLoading.style.display = 'none';
-        if (chartError) {
-          chartError.style.display = 'block';
-          chartError.innerHTML = '<p>加载失败：' + (error.message || '未知错误') + '</p>';
-        }
-        // 即使失败，也显示空图表
-        drawEmptyChart();
-        if (chartContainer) chartContainer.style.display = 'block';
-      });
-  }
-  
-  function drawChart(chartData) {
-    const ctx = document.getElementById('opinion-chart-canvas');
-    if (!ctx) return;
-    
-    const canvasCtx = ctx.getContext('2d');
-    
-    // 销毁旧图表
-    if (opinionChart) {
-      opinionChart.destroy();
-    }
-    
-    // 检查Chart是否可用
-    if (typeof Chart === 'undefined') {
-      chartError.style.display = 'block';
-      chartError.innerHTML = '<p>Chart.js库未加载，请刷新页面重试</p>';
-      return;
-    }
-    
-    // 创建组合图表：柱状图（数量）+ 折线图（情感分数）
-    opinionChart = new Chart(canvasCtx, {
-      type: 'bar',
-      data: {
-        labels: chartData.dates,
-        datasets: [
-          {
-            label: '总帖子数',
-            data: chartData.counts.total,
-            backgroundColor: 'rgba(33, 150, 243, 0.6)',
-            borderColor: 'rgba(33, 150, 243, 1)',
-            borderWidth: 1,
-            yAxisID: 'y'
-          },
-          {
-            label: '正面',
-            data: chartData.counts.positive,
-            backgroundColor: 'rgba(76, 175, 80, 0.6)',
-            borderColor: 'rgba(76, 175, 80, 1)',
-            borderWidth: 1,
-            yAxisID: 'y'
-          },
-          {
-            label: '负面',
-            data: chartData.counts.negative,
-            backgroundColor: 'rgba(244, 67, 54, 0.6)',
-            borderColor: 'rgba(244, 67, 54, 1)',
-            borderWidth: 1,
-            yAxisID: 'y'
-          },
-          {
-            label: '中性',
-            data: chartData.counts.neutral,
-            backgroundColor: 'rgba(158, 158, 158, 0.6)',
-            borderColor: 'rgba(158, 158, 158, 1)',
-            borderWidth: 1,
-            yAxisID: 'y'
-          },
-          {
-            label: '平均情感分数',
-            data: chartData.sentiment_scores,
-            type: 'line',
-            borderColor: 'rgba(255, 152, 0, 1)',
-            backgroundColor: 'rgba(255, 152, 0, 0.1)',
-            borderWidth: 2,
-            fill: false,
-            tension: 0.4,
-            yAxisID: 'y1',
-            pointRadius: 4,
-            pointHoverRadius: 6
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        aspectRatio: 2,
-        plugins: {
-          title: {
-            display: true,
-            text: '舆论数量统计（直方图）+ 情感趋势（线型图）',
-            font: { size: 16 }
-          },
-          legend: {
-            display: true,
-            position: 'top'
-          },
-          tooltip: {
-            mode: 'index',
-            intersect: false
-          }
-        },
-        scales: {
-          y: {
-            type: 'linear',
-            display: true,
-            position: 'left',
-            title: {
-              display: true,
-              text: '帖子数量'
-            },
-            beginAtZero: true
-          },
-          y1: {
-            type: 'linear',
-            display: true,
-            position: 'right',
-            title: {
-              display: true,
-              text: '情感分数'
-            },
-            beginAtZero: false,
-            grid: {
-              drawOnChartArea: false
-            }
-          },
-          x: {
-            title: {
-              display: true,
-              text: '日期'
-            }
-          }
-        }
-      }
-    });
-  }
-  
-  function drawEmptyChart() {
-    const ctx = document.getElementById('opinion-chart-canvas');
-    if (!ctx) {
-      console.error('[舆论统计] ❌ Canvas元素未找到');
-      return;
-    }
-    
-    // 销毁旧图表
-    if (opinionChart) {
-      opinionChart.destroy();
-      opinionChart = null;
-    }
-    
-    // 检查Chart是否可用
-    if (typeof Chart === 'undefined') {
-      console.error('[舆论统计] ❌ Chart.js库未加载');
-      return;
-    }
-    
-    // 创建空图表
-    opinionChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: ['暂无数据'],
-        datasets: [
-          {
-            label: '总帖子数',
-            data: [0],
-            backgroundColor: 'rgba(200, 200, 200, 0.3)',
-            borderColor: 'rgba(200, 200, 200, 0.5)',
-            borderWidth: 1
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        aspectRatio: 2,
-        plugins: {
-          title: {
-            display: true,
-            text: '舆论数量统计（直方图）+ 情感趋势（线型图）',
-            font: { size: 16 }
-          },
-          legend: {
-            display: true,
-            position: 'top'
-          },
-          tooltip: {
-            enabled: false
-          }
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            title: {
-              display: true,
-              text: '帖子数量'
-            }
-          },
-          x: {
-            title: {
-              display: true,
-              text: '日期'
-            }
-          }
-        }
-      }
-    });
-    
-    console.log('[舆论统计] ✅ 空图表已创建');
+    // loadOpinionChartData、drawChart、drawEmptyChart 已在全局作用域定义，这里不需要重复定义
   }
   
   // 在DOM加载完成后初始化
@@ -2430,6 +2465,7 @@ console.log('[舆论统计] ✅ openOpinionChart函数已定义');
     initOpinionChart();
   }
 })();
+</script>
 
 {% endblock js_content %}
 
